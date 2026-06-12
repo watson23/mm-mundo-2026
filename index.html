@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MM-Mundo 2026 — Veikkauskisa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg: #0d1421;
@@ -95,6 +98,48 @@
   .roundname { padding: 8px 12px; background: var(--panel2); font-weight: 700; font-size: 13px; color: var(--gold); border-bottom: 1px solid var(--border); }
 
   footer { text-align: center; color: var(--muted); font-size: 11px; margin-top: 26px; }
+
+  /* ===== flourish ===== */
+  body {
+    font-family: "Outfit", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: radial-gradient(1100px 480px at 50% -160px, #182c47 0%, var(--bg) 62%) fixed;
+  }
+  .mscore, table.board td, table.mini td { font-variant-numeric: tabular-nums; }
+  header h1 {
+    font-size: 32px; font-weight: 800;
+    background: linear-gradient(135deg, #ffe27a 15%, #ffb52e 50%, #ffd54a 85%);
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  header h1 .ball { -webkit-text-fill-color: initial; }
+  nav button { border-radius: 999px; transition: color .15s, border-color .15s, box-shadow .15s; }
+  nav button:hover { color: var(--text); border-color: var(--accent); }
+  nav button.active { background: linear-gradient(135deg, #46e890, #27b56e); box-shadow: 0 2px 16px rgba(61,220,132,.35); }
+  .panel { box-shadow: 0 4px 18px rgba(0,0,0,.28); }
+  table.board tr.top1 td { background: linear-gradient(90deg, rgba(255,213,74,.17), rgba(255,213,74,.03)); }
+  table.board tr.top2 td { background: linear-gradient(90deg, rgba(202,212,228,.13), rgba(202,212,228,.03)); }
+  table.board tr.top3 td { background: linear-gradient(90deg, rgba(205,127,50,.16), rgba(205,127,50,.03)); }
+  .day { border-left: 3px solid var(--blue); }
+  .mrow { transition: background .12s; }
+  .match .mrow:hover { background: rgba(255,255,255,.035); }
+  .match.islive { border-left: 3px solid var(--live); }
+  .match.islive .mscore { color: var(--live); }
+  .flag { margin-right: 4px; }
+
+  /* matches + live standings side panel */
+  .sideboard { display: none; }
+  @media (min-width: 920px) {
+    .mwrap { display: grid; grid-template-columns: 1fr 290px; gap: 14px; align-items: start; }
+    .sideboard { display: block; position: sticky; top: 66px; }
+    .sideboard h4 { margin: 0; padding: 10px 12px; font-size: 13px; color: var(--gold); border-bottom: 1px solid var(--border); background: var(--panel2); }
+    table.mini { width: 100%; border-collapse: collapse; font-size: 13px; }
+    table.mini td { padding: 4px 10px; border-bottom: 1px solid rgba(42,59,82,.45); }
+    table.mini tr:last-child td { border-bottom: none; }
+    table.mini td.r { color: var(--muted); width: 26px; }
+    table.mini td.t { text-align: right; font-weight: 700; color: var(--gold); }
+    .mv { font-size: 11px; margin-left: 5px; font-weight: 700; }
+    .mv.up { color: var(--accent); }
+    .mv.dn { color: var(--live); }
+  }
   @media (max-width: 600px) {
     .wrap { padding: 8px 6px 50px; }
     table.board th, table.board td { padding: 8px 6px; }
@@ -161,6 +206,19 @@ const FI_NAME = {};                       // English -> Finnish
 POOL_DATA.matches.forEach(m => { FI_NAME[m.home] = m.homeFi; FI_NAME[m.away] = m.awayFi; });
 const REAL_TEAMS = new Set(Object.keys(FI_NAME));
 function fi(team) { return FI_NAME[team] || team; }
+
+const FLAGS = {
+  "Mexico":"🇲🇽","South Africa":"🇿🇦","South Korea":"🇰🇷","Czechia":"🇨🇿","Canada":"🇨🇦",
+  "Bosnia-Herzegovina":"🇧🇦","United States":"🇺🇸","Paraguay":"🇵🇾","Brazil":"🇧🇷","Morocco":"🇲🇦",
+  "Australia":"🇦🇺","Türkiye":"🇹🇷","Haiti":"🇭🇹","Scotland":"🏴󠁧󠁢󠁳󠁣󠁴󠁿","Qatar":"🇶🇦","Switzerland":"🇨🇭",
+  "Germany":"🇩🇪","Curaçao":"🇨🇼","Ivory Coast":"🇨🇮","Netherlands":"🇳🇱","Japan":"🇯🇵","Sweden":"🇸🇪",
+  "Tunisia":"🇹🇳","Spain":"🇪🇸","Cape Verde":"🇨🇻","Belgium":"🇧🇪","Egypt":"🇪🇬","Saudi Arabia":"🇸🇦",
+  "Iran":"🇮🇷","New Zealand":"🇳🇿","France":"🇫🇷","Senegal":"🇸🇳","Iraq":"🇮🇶","Norway":"🇳🇴",
+  "Argentina":"🇦🇷","Jordan":"🇯🇴","Austria":"🇦🇹","Algeria":"🇩🇿","Portugal":"🇵🇹","Uzbekistan":"🇺🇿",
+  "England":"🏴󠁧󠁢󠁥󠁮󠁧󠁿","Croatia":"🇭🇷","Ghana":"🇬🇭","Panama":"🇵🇦","Colombia":"🇨🇴","Congo DR":"🇨🇩",
+  "Ecuador":"🇪🇨","Uruguay":"🇺🇾",
+};
+function flag(team) { return FLAGS[team] ? `<span class="flag">${FLAGS[team]}</span>` : ""; }
 
 function deaccent(s) { return s.normalize("NFD").replace(/[̀-ͯ]/g, ""); }
 function lev(a, b) {
@@ -397,7 +455,7 @@ function renderBoard({ rows }) {
   let h = `<div class="panel"><table class="board">
     <tr><th class="rank">#</th><th class="name">Nimi</th><th>Ottelut</th><th>Erikois</th><th>Yht.</th></tr>`;
   for (const r of rows) {
-    h += `<tr><td class="rank">${r.rank}.</td>
+    h += `<tr${r.rank <= 3 ? ` class="top${r.rank}"` : ""}><td class="rank">${r.rank}.</td>
       <td class="name">${medals[r.rank] ? `<span class="medal">${medals[r.rank]}</span>` : ""}${esc(r.name)}</td>
       <td>${r.matchPts}${r.livePts ? `<span class="livepts">+${r.livePts}</span>` : ""}</td>
       <td>${r.specPts}</td>
@@ -410,7 +468,7 @@ function renderBoard({ rows }) {
 const DAY_FMT = new Intl.DateTimeFormat("fi-FI", { weekday: "short", day: "numeric", month: "numeric", timeZone: "Europe/Helsinki" });
 const TIME_FMT = new Intl.DateTimeFormat("fi-FI", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Helsinki" });
 
-function renderMatches() {
+function renderMatches(boardRows) {
   const byDay = new Map();
   for (const m of POOL_DATA.matches) {
     const r = resolveMatch(m);
@@ -428,11 +486,11 @@ function renderMatches() {
       const open = expanded.has(idx) ? " open" : "";
       const score = r.score ? `${r.score[0]}–${r.score[1]}` : TIME_FMT.format(when);
       const status = r.live ? `<span class="badge-live">● ${esc(r.clock || "LIVE")}</span>` : (r.state === "post" ? "FT" : "");
-      h += `<div class="match${open}" data-row="${idx}">
+      h += `<div class="match${open}${r.live ? " islive" : ""}" data-row="${idx}">
         <div class="mrow" onclick="toggleMatch(${idx})">
           <div class="mtime">${TIME_FMT.format(when)}</div>
           <div class="mgroup">${esc(m.group)}</div>
-          <div class="mteams">${esc(m.homeFi)} – ${esc(m.awayFi)}</div>
+          <div class="mteams">${flag(m.home)}${esc(m.homeFi)} – ${flag(m.away)}${esc(m.awayFi)}</div>
           <div class="mscore${r.score ? "" : " pre"}">${score === TIME_FMT.format(when) && !r.score ? "–" : esc(score)}</div>
           <div class="mstatus">${status}</div>
         </div>
@@ -441,7 +499,24 @@ function renderMatches() {
     }
     h += "</div>";
   }
-  $("view-matches").innerHTML = `<div class="hint">Napauta ottelua nähdäksesi kaikkien veikkaukset. 🟡 = oikea tulos, 🟢 = oikea merkki.</div>` + h;
+  $("view-matches").innerHTML =
+    `<div class="hint">Napauta ottelua nähdäksesi kaikkien veikkaukset. 🟡 = oikea tulos, 🟢 = oikea merkki.</div>` +
+    `<div class="mwrap"><div class="mlist">${h}</div><aside class="sideboard">${renderSideboard(boardRows)}</aside></div>`;
+}
+
+function renderSideboard(rows) {
+  // rank movement: live standings vs. confirmed points only
+  const conf = [...rows].sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, "fi"));
+  const confRank = {};
+  let lr = 0, ls = null;
+  conf.forEach((r, i) => { if (r.total !== ls) { lr = i + 1; ls = r.total; } confRank[r.name] = lr; });
+  let h = `<div class="panel"><h4>📊 Tilanne${anyLive() ? ' <span class="badge-live">● LIVE</span>' : ""}</h4><table class="mini">`;
+  for (const r of rows) {
+    const d = confRank[r.name] - r.rank;
+    const mv = d > 0 ? `<span class="mv up">▲${d}</span>` : d < 0 ? `<span class="mv dn">▼${-d}</span>` : "";
+    h += `<tr><td class="r">${r.rank}.</td><td>${esc(r.name)}${mv}</td><td class="t">${r.total}${r.livePts ? `<span class="livepts">+${r.livePts}</span>` : ""}</td></tr>`;
+  }
+  return h + `</table></div>`;
 }
 
 function renderPicks(m, r) {
@@ -465,23 +540,20 @@ function renderSpecials(sp) {
   const s = POOL_DATA.specials;
   let h = "";
 
-  const teamChips = (arr) => arr.map(x =>
-    `<span class="chip ${x.hit ? "hit" + (x.got > 10 ? " bonus" : "") : (sp.qfTeams.size >= 8 ? "miss" : "")}">${esc(fi(x.team))}${x.hit ? " +" + x.got : ""}</span>`).join("");
-
   h += `<h3 class="sec">8 parasta <span class="note">(10 p / oikea joukkue, +10 p bonus jos ei ennakkosuosikki)</span></h3>`;
   h += `<div class="panel"><table class="spec-table"><tr><th>Nimi</th><th>Veikkaus</th><th style="text-align:right">P</th></tr>`;
   for (const p of POOL_DATA.participants) {
     const d = sp.per[p].detail.top8;
-    h += `<tr><td><b>${esc(p)}</b></td><td>${d.map(x => `<span class="chip ${x.hit ? "hit" + (x.got > 10 ? " bonus" : "") : (sp.qfTeams.size >= 8 ? "miss" : "")}">${esc(fi(x.team))}</span>`).join("")}</td><td class="pts">${d.reduce((a, x) => a + x.got, 0) || ""}</td></tr>`;
+    h += `<tr><td><b>${esc(p)}</b></td><td>${d.map(x => `<span class="chip ${x.hit ? "hit" + (x.got > 10 ? " bonus" : "") : (sp.qfTeams.size >= 8 ? "miss" : "")}">${flag(x.team)}${esc(fi(x.team))}</span>`).join("")}</td><td class="pts">${d.reduce((a, x) => a + x.got, 0) || ""}</td></tr>`;
   }
   h += `</table></div>`;
-  h += sp.qfTeams.size ? `<div class="note">Puolivälierissä varmistuneet: ${[...sp.qfTeams].map(fi).map(esc).join(", ")}</div>` : `<div class="note">Ratkeaa kun puolivälieräparit selviävät.</div>`;
+  h += sp.qfTeams.size ? `<div class="note">Puolivälierissä varmistuneet: ${[...sp.qfTeams].map(t => flag(t) + esc(fi(t))).join(", ")}</div>` : `<div class="note">Ratkeaa kun puolivälieräparit selviävät.</div>`;
 
   h += `<h3 class="sec">4 parasta <span class="note">(samat säännöt)</span></h3>`;
   h += `<div class="panel"><table class="spec-table"><tr><th>Nimi</th><th>Veikkaus</th><th style="text-align:right">P</th></tr>`;
   for (const p of POOL_DATA.participants) {
     const d = sp.per[p].detail.top4;
-    h += `<tr><td><b>${esc(p)}</b></td><td>${d.map(x => `<span class="chip ${x.hit ? "hit" + (x.got > 10 ? " bonus" : "") : (sp.sfTeams.size >= 4 ? "miss" : "")}">${esc(fi(x.team))}</span>`).join("")}</td><td class="pts">${d.reduce((a, x) => a + x.got, 0) || ""}</td></tr>`;
+    h += `<tr><td><b>${esc(p)}</b></td><td>${d.map(x => `<span class="chip ${x.hit ? "hit" + (x.got > 10 ? " bonus" : "") : (sp.sfTeams.size >= 4 ? "miss" : "")}">${flag(x.team)}${esc(fi(x.team))}</span>`).join("")}</td><td class="pts">${d.reduce((a, x) => a + x.got, 0) || ""}</td></tr>`;
   }
   h += `</table></div>`;
 
@@ -509,7 +581,7 @@ function renderSpecials(sp) {
     <tr><th>Nimi</th><th>Pronssi</th><th>Hopea</th><th>Mestari</th><th style="text-align:right">P</th></tr>`;
   for (const p of POOL_DATA.participants) {
     const d = sp.per[p].detail;
-    const cell = (x, actual) => `<span class="chip ${x.hit ? "hit bonus" : (actual ? "miss" : "")}">${esc(x.pick ? fi(x.pick) : "—")} (${x.potential || ""})</span>`;
+    const cell = (x, actual) => `<span class="chip ${x.hit ? "hit bonus" : (actual ? "miss" : "")}">${x.pick ? flag(x.pick) : ""}${esc(x.pick ? fi(x.pick) : "—")} (${x.potential || ""})</span>`;
     h += `<tr><td><b>${esc(p)}</b></td>
       <td>${cell(d.bronze, sp.bronzeWinner)}</td>
       <td>${cell(d.finalLoser, sp.finalLoser)}</td>
@@ -540,7 +612,7 @@ function renderSpecials(sp) {
         const score = st.state === "pre" ? "–" : `${home.score}–${away.score}`;
         h += `<div class="match"><div class="mrow">
           <div class="mtime">${TIME_FMT.format(new Date(e.date))}</div>
-          <div class="mteams">${esc(fi(home.team.displayName))} – ${esc(fi(away.team.displayName))}</div>
+          <div class="mteams">${flag(home.team.displayName)}${esc(fi(home.team.displayName))} – ${flag(away.team.displayName)}${esc(fi(away.team.displayName))}</div>
           <div class="mscore${st.state === "pre" ? " pre" : ""}">${esc(score)}</div>
           <div class="mstatus">${live ? `<span class="badge-live">● ${esc(e.status.displayClock || "LIVE")}</span>` : (st.state === "post" ? esc(st.shortDetail) : DAY_FMT.format(new Date(e.date)))}</div>
         </div></div>`;
@@ -554,7 +626,7 @@ function renderSpecials(sp) {
 function renderAll() {
   const { rows, sp } = computeTotals();
   renderBoard({ rows });
-  renderMatches();
+  renderMatches(rows);
   renderSpecials(sp);
 }
 
