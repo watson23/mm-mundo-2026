@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MM-Mundo 2026 — Veikkauskisa</title>
+<style>
+  :root {
+    --bg: #0d1421;
+    --panel: #16202f;
+    --panel2: #1d2a3d;
+    --border: #2a3b52;
+    --text: #e8eef6;
+    --muted: #8fa3bb;
+    --accent: #3ddc84;
+    --gold: #ffd54a;
+    --live: #ff5470;
+    --blue: #5aa9ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 15px;
+    line-height: 1.45;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 12px 12px 60px; }
+  header { text-align: center; padding: 18px 0 6px; }
+  header h1 { margin: 0; font-size: 26px; letter-spacing: 0.5px; }
+  header h1 .ball { font-size: 22px; }
+  .prizes { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .updated { color: var(--muted); font-size: 12px; margin-top: 6px; }
+  .updated .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-right: 5px; vertical-align: middle; }
+  .updated.err .dot { background: var(--live); }
+
+  nav { display: flex; gap: 6px; margin: 16px 0 14px; position: sticky; top: 0; background: var(--bg); padding: 8px 0; z-index: 10; }
+  nav button {
+    flex: 1; padding: 10px 4px; border: 1px solid var(--border); border-radius: 10px;
+    background: var(--panel); color: var(--muted); font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  nav button.active { background: var(--accent); color: #08311c; border-color: var(--accent); }
+
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 14px; }
+
+  /* leaderboard */
+  table.board { width: 100%; border-collapse: collapse; }
+  table.board th, table.board td { padding: 9px 10px; text-align: right; }
+  table.board th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
+  table.board td.name, table.board th.name { text-align: left; font-weight: 600; }
+  table.board td.rank, table.board th.rank { text-align: left; width: 36px; color: var(--muted); }
+  table.board tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+  table.board td.total { font-weight: 700; color: var(--gold); font-size: 16px; }
+  .livepts { color: var(--live); font-weight: 700; font-size: 12px; margin-left: 4px; animation: pulse 1.6s infinite; }
+  .medal { margin-right: 4px; }
+
+  /* matches */
+  .day { padding: 8px 12px; background: var(--panel2); font-weight: 700; font-size: 13px; color: var(--blue); text-transform: capitalize; border-bottom: 1px solid var(--border); }
+  .match { border-bottom: 1px solid var(--border); cursor: pointer; }
+  .match:last-child { border-bottom: none; }
+  .mrow { display: flex; align-items: center; gap: 8px; padding: 10px 12px; }
+  .mtime { width: 44px; color: var(--muted); font-size: 12px; flex-shrink: 0; }
+  .mgroup { width: 20px; color: var(--muted); font-size: 11px; flex-shrink: 0; }
+  .mteams { flex: 1; min-width: 0; font-weight: 600; font-size: 14px; }
+  .mscore { font-weight: 800; font-size: 16px; min-width: 44px; text-align: center; }
+  .mscore.pre { color: var(--muted); font-weight: 400; font-size: 12px; }
+  .mstatus { min-width: 40px; text-align: right; font-size: 11px; color: var(--muted); }
+  .badge-live { color: var(--live); font-weight: 800; animation: pulse 1.2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
+  .picks { display: none; padding: 4px 12px 12px; }
+  .match.open .picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 5px; }
+  .pick { display: flex; justify-content: space-between; padding: 5px 8px; border-radius: 7px; background: var(--panel2); font-size: 13px; }
+  .pick .pp { font-weight: 700; }
+  .pick.p5 { background: #4d3f10; color: var(--gold); }
+  .pick.p4 { background: #44390f; color: var(--gold); }
+  .pick.p2 { background: #14402a; color: var(--accent); }
+  .pick.p0 { color: var(--muted); }
+  .pick.live { outline: 1px dashed var(--live); }
+  .hint { color: var(--muted); font-size: 11px; padding: 0 12px 10px; }
+
+  /* specials */
+  h3.sec { margin: 18px 4px 8px; font-size: 15px; }
+  .spec-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .spec-table th, .spec-table td { padding: 7px 9px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .spec-table th { color: var(--muted); font-size: 11px; text-transform: uppercase; }
+  .spec-table td.pts { text-align: right; font-weight: 700; color: var(--gold); white-space: nowrap; }
+  .chip { display: inline-block; padding: 1px 7px; border-radius: 20px; background: var(--panel2); margin: 1px 2px 1px 0; font-size: 12px; }
+  .chip.hit { background: #14402a; color: var(--accent); font-weight: 600; }
+  .chip.hit.bonus { background: #4d3f10; color: var(--gold); }
+  .chip.miss { color: var(--muted); text-decoration: line-through; opacity: 0.7; }
+  .note { color: var(--muted); font-size: 12px; margin: 6px 4px 14px; }
+  .scorerlist { font-size: 13px; color: var(--muted); margin: 4px; }
+  .ko .mrow { cursor: default; }
+  .roundname { padding: 8px 12px; background: var(--panel2); font-weight: 700; font-size: 13px; color: var(--gold); border-bottom: 1px solid var(--border); }
+
+  footer { text-align: center; color: var(--muted); font-size: 11px; margin-top: 26px; }
+  @media (max-width: 600px) {
+    .wrap { padding: 8px 6px 50px; }
+    table.board th, table.board td { padding: 8px 6px; }
+    .match.open .picks { grid-template-columns: repeat(auto-fill, minmax(135px, 1fr)); }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1><span class="ball">⚽</span> MM-Mundo 2026</h1>
+    <div class="prizes" id="prizes"></div>
+    <div class="updated" id="updated"><span class="dot"></span>Ladataan tuloksia…</div>
+  </header>
+
+  <nav>
+    <button id="tab-board" class="active" onclick="setTab('board')">Tilanne</button>
+    <button id="tab-matches" onclick="setTab('matches')">Ottelut</button>
+    <button id="tab-specials" onclick="setTab('specials')">Erikoisveikkaukset</button>
+  </nav>
+
+  <div id="view-board"></div>
+  <div id="view-matches" style="display:none"></div>
+  <div id="view-specials" style="display:none"></div>
+
+  <footer>
+    Pisteet lasketaan automaattisesti live-tuloksista (ESPN). Käynnissä olevien otteluiden pisteet ovat alustavia.
+  </footer>
+</div>
+
+<script src="data.js"></script>
+<script>
+"use strict";
+
+/* ====== Manual overrides — edit if the API gets something wrong ====== */
+const OVERRIDES = {
+  // match results by sheet row number, e.g. 5: [2, 0]  (home-away in sheet orientation)
+  results: {},
+  // force the top scorer list (canonical names), e.g. ["Kylian Mbappé"]
+  topScorers: null,
+  // force semifinal scorers list
+  semiScorers: null,
+};
+
+/* ====== Scoring rules ====== */
+const BIG9 = new Set(["Brazil","Argentina","France","Spain","England","Germany","Netherlands","Belgium","Portugal"]);
+function medalPoints(team) {
+  if (["Brazil","Argentina","France","England","Spain","Portugal"].includes(team)) return 10;
+  if (team === "Germany") return 15;
+  if (team === "Netherlands" || team === "Belgium") return 20;
+  return 40;
+}
+function matchPoints(pick, res) {
+  if (!pick || !res) return null;
+  if (pick[0] === res[0] && pick[1] === res[1]) {
+    const low = (res[0] === 1 && res[1] === 0) || (res[0] === 1 && res[1] === 1) || (res[0] === 0 && res[1] === 1);
+    return low ? 4 : 5;
+  }
+  return Math.sign(pick[0] - pick[1]) === Math.sign(res[0] - res[1]) ? 2 : 0;
+}
+
+/* ====== Name helpers ====== */
+const FI_NAME = {};                       // English -> Finnish
+POOL_DATA.matches.forEach(m => { FI_NAME[m.home] = m.homeFi; FI_NAME[m.away] = m.awayFi; });
+const REAL_TEAMS = new Set(Object.keys(FI_NAME));
+function fi(team) { return FI_NAME[team] || team; }
+
+function deaccent(s) { return s.normalize("NFD").replace(/[̀-ͯ]/g, ""); }
+function lev(a, b) {
+  if (Math.abs(a.length - b.length) > 2) return 99;
+  const d = Array.from({length: a.length + 1}, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 0; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++)
+    for (let j = 1; j <= b.length; j++)
+      d[i][j] = Math.min(d[i-1][j] + 1, d[i][j-1] + 1, d[i-1][j-1] + (a[i-1] === b[j-1] ? 0 : 1));
+  return d[a.length][b.length];
+}
+// does a picked player name match a scorer's full name?
+function playerMatch(pick, scorerName) {
+  const pt = deaccent(pick.toLowerCase()).split(/[\s.]+/).filter(t => t.length >= 3);
+  const st = deaccent(scorerName.toLowerCase()).split(/[\s.]+/).filter(Boolean);
+  if (!pt.length) return false;
+  // the pick's most specific (longest) token must match some token of the scorer name
+  const main = pt.reduce((a, b) => b.length >= a.length ? b : a);
+  return st.some(t => t === main || (main.length >= 4 && lev(t, main) <= 1));
+}
+
+/* ====== Live data ====== */
+const API = "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=20260610-20260720&limit=250";
+let EVENTS = [];          // raw ESPN events
+let EV_BY_PAIR = {};      // "TeamA|TeamB" sorted -> event info
+let KO_EVENTS = [];       // knockout events sorted by date
+let GOALS = {};           // athlete display name -> goal count (whole tournament)
+let lastFetchOk = null;
+let expanded = new Set();
+let activeTab = "board";
+
+function pairKey(a, b) { return [a, b].sort().join("|"); }
+
+function parseEvents(events) {
+  EVENTS = events;
+  EV_BY_PAIR = {};
+  GOALS = {};
+  const groupIds = new Set();
+  for (const e of events) {
+    const c = e.competitions[0];
+    const comps = c.competitors || [];
+    const home = comps.find(x => x.homeAway === "home");
+    const away = comps.find(x => x.homeAway === "away");
+    if (!home || !away) continue;
+    const info = {
+      id: e.id, date: e.date,
+      state: e.status.type.state,              // pre | in | post
+      detail: e.status.type.shortDetail,
+      clock: e.status.displayClock,
+      completed: e.status.type.completed,
+      homeName: home.team.displayName, awayName: away.team.displayName,
+      homeScore: parseInt(home.score || "0", 10), awayScore: parseInt(away.score || "0", 10),
+      winner: comps.find(x => x.winner)?.team.displayName || null,
+      scorers: [],
+    };
+    for (const d of (c.details || [])) {
+      if (d.scoringPlay && !d.ownGoal && !d.shootout) {
+        for (const a of (d.athletesInvolved || []).slice(0, 1)) {
+          info.scorers.push(a.displayName);
+          GOALS[a.displayName] = (GOALS[a.displayName] || 0) + 1;
+        }
+      }
+    }
+    if (REAL_TEAMS.has(info.homeName) && REAL_TEAMS.has(info.awayName)) {
+      const key = pairKey(info.homeName, info.awayName);
+      if (!(key in EV_BY_PAIR)) { EV_BY_PAIR[key] = info; groupIds.add(e.id); }
+    }
+  }
+  // group matches claim their events via pair keys; everything else (or repeats) is knockout
+  KO_EVENTS = events
+    .filter(e => !groupIds.has(e.id) || new Date(e.date) > new Date("2026-06-28T00:00Z"))
+    .map(e => events.find(x => x.id === e.id))
+    .filter(Boolean);
+  // rebuild knockout info objects in chronological order
+  KO_EVENTS = events
+    .filter(e => !groupIds.has(e.id))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function koRoundName(idx, total, e) {
+  // chronological: 16×R32, 8×R16, 4×QF, 2×SF, bronze, final
+  const name = e.name || "";
+  if (/Loser/.test(name)) return "bronze";
+  if (idx === total - 1) return "final";
+  if (idx < 16) return "r32";
+  if (idx < 24) return "r16";
+  if (idx < 28) return "qf";
+  if (idx < 30) return "sf";
+  return idx === total - 2 ? "bronze" : "final";
+}
+const ROUND_FI = { r32: "Pudotuspelit – 32 parasta", r16: "Neljännesvälierät (16 parasta)", qf: "Puolivälierät (8 parasta)", sf: "Välierät", bronze: "Pronssiottelu", final: "Loppuottelu" };
+
+function koInfo() {
+  const out = { r32: [], r16: [], qf: [], sf: [], bronze: [], final: [] };
+  KO_EVENTS.forEach((e, i) => {
+    const round = koRoundName(i, KO_EVENTS.length, e);
+    out[round].push(e);
+  });
+  return out;
+}
+function realTeamsOf(events) {
+  const s = new Set();
+  for (const e of events)
+    for (const c of e.competitions[0].competitors || [])
+      if (REAL_TEAMS.has(c.team.displayName)) s.add(c.team.displayName);
+  return s;
+}
+
+/* ====== Per-match result resolution ====== */
+function resolveMatch(m) {
+  if (OVERRIDES.results[m.row]) return { score: OVERRIDES.results[m.row], state: "post", detail: "FT*", live: false };
+  const ev = EV_BY_PAIR[pairKey(m.home, m.away)];
+  if (ev && ev.state !== "pre") {
+    const swapped = ev.homeName !== m.home;
+    const score = swapped ? [ev.awayScore, ev.homeScore] : [ev.homeScore, ev.awayScore];
+    return { score, state: ev.state, detail: ev.detail, clock: ev.clock, live: ev.state === "in", date: ev.date };
+  }
+  if (m.sheetResult) return { score: m.sheetResult, state: "post", detail: "FT", live: false };
+  return { score: null, state: "pre", detail: ev ? ev.detail : "", live: false, date: ev ? ev.date : null };
+}
+
+/* ====== Specials evaluation ====== */
+function evalSpecials() {
+  const ko = koInfo();
+  const qfTeams = realTeamsOf(ko.qf);   // confirmed quarterfinalists so far
+  const sfTeams = realTeamsOf(ko.sf);
+  const bronzeEv = ko.bronze[0], finalEv = ko.final[0];
+  const bronzeDone = bronzeEv && bronzeEv.status.type.completed;
+  const finalDone = finalEv && finalEv.status.type.completed;
+  const bronzeWinner = bronzeDone ? winnerOf(bronzeEv) : null;
+  const champion = finalDone ? winnerOf(finalEv) : null;
+  const finalLoser = finalDone ? loserOf(finalEv) : null;
+
+  // semifinal scorers (goals are permanent as soon as scored)
+  let semiScorers = OVERRIDES.semiScorers;
+  if (!semiScorers) {
+    semiScorers = [];
+    for (const e of ko.sf) {
+      const c = e.competitions[0];
+      for (const d of (c.details || []))
+        if (d.scoringPlay && !d.ownGoal && !d.shootout)
+          for (const a of (d.athletesInvolved || []).slice(0, 1)) semiScorers.push(a.displayName);
+    }
+  }
+  // top scorers — only final after the tournament; show current leaders meanwhile
+  const maxGoals = Math.max(0, ...Object.values(GOALS));
+  const leaders = Object.keys(GOALS).filter(n => GOALS[n] === maxGoals && maxGoals > 0);
+  const topScorers = OVERRIDES.topScorers || (finalDone ? leaders : null);
+
+  const per = {};
+  for (const p of POOL_DATA.participants) {
+    const s = POOL_DATA.specials;
+    let pts = 0;
+    const detail = {};
+    // top 8 & top 4: 10p per correct team + 10p bonus if not BIG9
+    detail.top8 = (s.top8[p] || []).map(t => {
+      const hit = qfTeams.has(t);
+      const got = hit ? 10 + (BIG9.has(t) ? 0 : 10) : 0;
+      pts += got;
+      return { team: t, hit, got };
+    });
+    detail.top4 = (s.top4[p] || []).map(t => {
+      const hit = sfTeams.has(t);
+      const got = hit ? 10 + (BIG9.has(t) ? 0 : 10) : 0;
+      pts += got;
+      return { team: t, hit, got };
+    });
+    // scores in semifinal
+    const ssPick = s.semiScorer[p];
+    const ssHit = !!(ssPick && semiScorers.some(n => playerMatch(ssPick, n)));
+    detail.semiScorer = { pick: ssPick, hit: ssHit, got: ssHit ? 10 : 0 };
+    pts += detail.semiScorer.got;
+    // top scorer (decided at end)
+    const tsPick = s.topScorer[p];
+    const tsHit = !!(tsPick && topScorers && topScorers.some(n => playerMatch(tsPick, n)));
+    const tsLeading = !!(tsPick && !topScorers && leaders.some(n => playerMatch(tsPick, n)));
+    detail.topScorer = { pick: tsPick, hit: tsHit, leading: tsLeading, got: tsHit ? 10 : 0 };
+    pts += detail.topScorer.got;
+    // medal picks
+    detail.bronze = medalPick(s.bronze[p], bronzeWinner); pts += detail.bronze.got;
+    detail.finalLoser = medalPick(s.finalLoser[p], finalLoser); pts += detail.finalLoser.got;
+    detail.champion = medalPick(s.champion[p], champion); pts += detail.champion.got;
+    per[p] = { pts, detail };
+  }
+  return { per, qfTeams, sfTeams, semiScorers, topScorers, leaders, maxGoals, bronzeWinner, champion, finalLoser };
+}
+function medalPick(pick, actual) {
+  if (!pick) return { pick: null, hit: false, got: 0, potential: 0 };
+  const hit = actual === pick;
+  return { pick, hit, decided: actual !== null, got: hit ? medalPoints(pick) : 0, potential: medalPoints(pick) };
+}
+function winnerOf(e) { return e.competitions[0].competitors.find(c => c.winner)?.team.displayName || null; }
+function loserOf(e) { return e.competitions[0].competitors.find(c => !c.winner)?.team.displayName || null; }
+
+/* ====== Totals ====== */
+function computeTotals() {
+  const sp = evalSpecials();
+  const rows = POOL_DATA.participants.map((p, i) => {
+    let confirmed = 0, live = 0;
+    for (const m of POOL_DATA.matches) {
+      const r = resolveMatch(m);
+      if (!r.score) continue;
+      const pts = matchPoints(m.picks[i], r.score);
+      if (pts == null) continue;
+      if (r.live) live += pts; else confirmed += pts;
+    }
+    return { name: p, matchPts: confirmed, livePts: live, specPts: sp.per[p].pts, total: confirmed + sp.per[p].pts };
+  });
+  rows.sort((a, b) => (b.total + b.livePts) - (a.total + a.livePts) || a.name.localeCompare(b.name, "fi"));
+  // shared ranks
+  let lastScore = null, lastRank = 0;
+  rows.forEach((r, idx) => {
+    const s = r.total + r.livePts;
+    if (s !== lastScore) { lastRank = idx + 1; lastScore = s; }
+    r.rank = lastRank;
+  });
+  return { rows, sp };
+}
+
+/* ====== Rendering ====== */
+const $ = id => document.getElementById(id);
+function esc(s) { return String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+function setTab(t) {
+  activeTab = t;
+  for (const x of ["board", "matches", "specials"]) {
+    $("view-" + x).style.display = x === t ? "" : "none";
+    $("tab-" + x).classList.toggle("active", x === t);
+  }
+}
+
+function renderBoard({ rows }) {
+  const medals = { 1: "🥇", 2: "🥈", 3: "🥉" };
+  let h = `<div class="panel"><table class="board">
+    <tr><th class="rank">#</th><th class="name">Nimi</th><th>Ottelut</th><th>Erikois</th><th>Yht.</th></tr>`;
+  for (const r of rows) {
+    h += `<tr><td class="rank">${r.rank}.</td>
+      <td class="name">${medals[r.rank] ? `<span class="medal">${medals[r.rank]}</span>` : ""}${esc(r.name)}</td>
+      <td>${r.matchPts}${r.livePts ? `<span class="livepts">+${r.livePts}</span>` : ""}</td>
+      <td>${r.specPts}</td>
+      <td class="total">${r.total}${r.livePts ? `<span class="livepts">+${r.livePts}</span>` : ""}</td></tr>`;
+  }
+  h += "</table></div>";
+  $("view-board").innerHTML = h;
+}
+
+const DAY_FMT = new Intl.DateTimeFormat("fi-FI", { weekday: "short", day: "numeric", month: "numeric", timeZone: "Europe/Helsinki" });
+const TIME_FMT = new Intl.DateTimeFormat("fi-FI", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Helsinki" });
+
+function renderMatches() {
+  const byDay = new Map();
+  for (const m of POOL_DATA.matches) {
+    const r = resolveMatch(m);
+    const when = new Date(r.date || m.kickoff.replace("Z", ":00Z").replace("::", ":"));
+    const day = DAY_FMT.format(when);
+    if (!byDay.has(day)) byDay.set(day, []);
+    byDay.get(day).push({ m, r, when });
+  }
+  let h = "";
+  for (const [day, items] of byDay) {
+    h += `<div class="panel"><div class="day">${esc(day)}</div>`;
+    items.sort((a, b) => a.when - b.when);
+    for (const { m, r, when } of items) {
+      const idx = m.row;
+      const open = expanded.has(idx) ? " open" : "";
+      const score = r.score ? `${r.score[0]}–${r.score[1]}` : TIME_FMT.format(when);
+      const status = r.live ? `<span class="badge-live">● ${esc(r.clock || "LIVE")}</span>` : (r.state === "post" ? "FT" : "");
+      h += `<div class="match${open}" data-row="${idx}">
+        <div class="mrow" onclick="toggleMatch(${idx})">
+          <div class="mtime">${TIME_FMT.format(when)}</div>
+          <div class="mgroup">${esc(m.group)}</div>
+          <div class="mteams">${esc(m.homeFi)} – ${esc(m.awayFi)}</div>
+          <div class="mscore${r.score ? "" : " pre"}">${score === TIME_FMT.format(when) && !r.score ? "–" : esc(score)}</div>
+          <div class="mstatus">${status}</div>
+        </div>
+        <div class="picks">${renderPicks(m, r)}</div>
+      </div>`;
+    }
+    h += "</div>";
+  }
+  $("view-matches").innerHTML = `<div class="hint">Napauta ottelua nähdäksesi kaikkien veikkaukset. 🟡 = oikea tulos, 🟢 = oikea merkki.</div>` + h;
+}
+
+function renderPicks(m, r) {
+  let h = "";
+  POOL_DATA.participants.forEach((p, i) => {
+    const pick = m.picks[i];
+    const pts = r.score ? matchPoints(pick, r.score) : null;
+    const cls = pts == null ? "" : ` p${pts}`;
+    const liveCls = r.live && pts ? " live" : "";
+    h += `<div class="pick${cls}${liveCls}"><span>${esc(p)}</span><span>${pick ? pick[0] + "–" + pick[1] : "—"}${pts != null ? ` <span class="pp">${pts ? "+" + pts : "0"}</span>` : ""}</span></div>`;
+  });
+  return h;
+}
+
+function toggleMatch(row) {
+  if (expanded.has(row)) expanded.delete(row); else expanded.add(row);
+  document.querySelector(`.match[data-row="${row}"]`)?.classList.toggle("open");
+}
+
+function renderSpecials(sp) {
+  const s = POOL_DATA.specials;
+  let h = "";
+
+  const teamChips = (arr) => arr.map(x =>
+    `<span class="chip ${x.hit ? "hit" + (x.got > 10 ? " bonus" : "") : (sp.qfTeams.size >= 8 ? "miss" : "")}">${esc(fi(x.team))}${x.hit ? " +" + x.got : ""}</span>`).join("");
+
+  h += `<h3 class="sec">8 parasta <span class="note">(10 p / oikea joukkue, +10 p bonus jos ei ennakkosuosikki)</span></h3>`;
+  h += `<div class="panel"><table class="spec-table"><tr><th>Nimi</th><th>Veikkaus</th><th style="text-align:right">P</th></tr>`;
+  for (const p of POOL_DATA.participants) {
+    const d = sp.per[p].detail.top8;
+    h += `<tr><td><b>${esc(p)}</b></td><td>${d.map(x => `<span class="chip ${x.hit ? "hit" + (x.got > 10 ? " bonus" : "") : (sp.qfTeams.size >= 8 ? "miss" : "")}">${esc(fi(x.team))}</span>`).join("")}</td><td class="pts">${d.reduce((a, x) => a + x.got, 0) || ""}</td></tr>`;
+  }
+  h += `</table></div>`;
+  h += sp.qfTeams.size ? `<div class="note">Puolivälierissä varmistuneet: ${[...sp.qfTeams].map(fi).map(esc).join(", ")}</div>` : `<div class="note">Ratkeaa kun puolivälieräparit selviävät.</div>`;
+
+  h += `<h3 class="sec">4 parasta <span class="note">(samat säännöt)</span></h3>`;
+  h += `<div class="panel"><table class="spec-table"><tr><th>Nimi</th><th>Veikkaus</th><th style="text-align:right">P</th></tr>`;
+  for (const p of POOL_DATA.participants) {
+    const d = sp.per[p].detail.top4;
+    h += `<tr><td><b>${esc(p)}</b></td><td>${d.map(x => `<span class="chip ${x.hit ? "hit" + (x.got > 10 ? " bonus" : "") : (sp.sfTeams.size >= 4 ? "miss" : "")}">${esc(fi(x.team))}</span>`).join("")}</td><td class="pts">${d.reduce((a, x) => a + x.got, 0) || ""}</td></tr>`;
+  }
+  h += `</table></div>`;
+
+  h += `<h3 class="sec">Maaliveikkaukset</h3>`;
+  h += `<div class="panel"><table class="spec-table">
+    <tr><th>Nimi</th><th>Tekee maalin välierissä (10 p)</th><th>Maalikuningas (10 p)</th><th style="text-align:right">P</th></tr>`;
+  for (const p of POOL_DATA.participants) {
+    const d = sp.per[p].detail;
+    const ss = d.semiScorer, ts = d.topScorer;
+    h += `<tr><td><b>${esc(p)}</b></td>
+      <td><span class="chip ${ss.hit ? "hit" : ""}">${esc(ss.pick || "—")}</span></td>
+      <td><span class="chip ${ts.hit ? "hit" : ""}">${esc(ts.pick || "—")}</span>${ts.leading ? ` <span class="note">johdossa 👀</span>` : ""}</td>
+      <td class="pts">${(ss.got + ts.got) || ""}</td></tr>`;
+  }
+  h += `</table></div>`;
+  if (sp.maxGoals > 0) {
+    h += `<div class="scorerlist">Maalikuningasjahti (${sp.maxGoals} ${sp.maxGoals === 1 ? "maali" : "maalia"}): ${sp.leaders.map(esc).join(", ")}${sp.topScorers ? " — <b>ratkennut</b>" : " — kesken"}</div>`;
+  }
+  if (sp.semiScorers.length) {
+    h += `<div class="scorerlist">Välierien maalintekijät: ${sp.semiScorers.map(esc).join(", ")}</div>`;
+  }
+
+  h += `<h3 class="sec">Mitaliveikkaukset <span class="note">(suursuosikit 10 p · Saksa 15 p · Hollanti/Belgia 20 p · muut 40 p)</span></h3>`;
+  h += `<div class="panel"><table class="spec-table">
+    <tr><th>Nimi</th><th>Pronssi</th><th>Hopea</th><th>Mestari</th><th style="text-align:right">P</th></tr>`;
+  for (const p of POOL_DATA.participants) {
+    const d = sp.per[p].detail;
+    const cell = (x, actual) => `<span class="chip ${x.hit ? "hit bonus" : (actual ? "miss" : "")}">${esc(x.pick ? fi(x.pick) : "—")} (${x.potential || ""})</span>`;
+    h += `<tr><td><b>${esc(p)}</b></td>
+      <td>${cell(d.bronze, sp.bronzeWinner)}</td>
+      <td>${cell(d.finalLoser, sp.finalLoser)}</td>
+      <td>${cell(d.champion, sp.champion)}</td>
+      <td class="pts">${(d.bronze.got + d.finalLoser.got + d.champion.got) || ""}</td></tr>`;
+  }
+  h += `</table></div>`;
+  h += `<div class="note">Suluissa pistemäärä jos veikkaus osuu.</div>`;
+
+  // knockout results
+  const ko = koInfo();
+  const rounds = ["r32", "r16", "qf", "sf", "bronze", "final"];
+  const playableRounds = rounds.filter(r => ko[r].some(e =>
+    (e.competitions[0].competitors || []).some(c => REAL_TEAMS.has(c.team.displayName))));
+  if (playableRounds.length) {
+    h += `<h3 class="sec">Jatko-ottelut</h3>`;
+    for (const r of playableRounds) {
+      const playable = ko[r].filter(e => {
+        const cs = e.competitions[0].competitors || [];
+        return cs.some(c => REAL_TEAMS.has(c.team.displayName));
+      });
+      h += `<div class="panel ko"><div class="roundname">${ROUND_FI[r]}</div>`;
+      for (const e of playable.sort((a, b) => a.date.localeCompare(b.date))) {
+        const c = e.competitions[0];
+        const home = c.competitors.find(x => x.homeAway === "home"), away = c.competitors.find(x => x.homeAway === "away");
+        const st = e.status.type;
+        const live = st.state === "in";
+        const score = st.state === "pre" ? "–" : `${home.score}–${away.score}`;
+        h += `<div class="match"><div class="mrow">
+          <div class="mtime">${TIME_FMT.format(new Date(e.date))}</div>
+          <div class="mteams">${esc(fi(home.team.displayName))} – ${esc(fi(away.team.displayName))}</div>
+          <div class="mscore${st.state === "pre" ? " pre" : ""}">${esc(score)}</div>
+          <div class="mstatus">${live ? `<span class="badge-live">● ${esc(e.status.displayClock || "LIVE")}</span>` : (st.state === "post" ? esc(st.shortDetail) : DAY_FMT.format(new Date(e.date)))}</div>
+        </div></div>`;
+      }
+      h += `</div>`;
+    }
+  }
+  $("view-specials").innerHTML = h;
+}
+
+function renderAll() {
+  const { rows, sp } = computeTotals();
+  renderBoard({ rows });
+  renderMatches();
+  renderSpecials(sp);
+}
+
+/* ====== Refresh loop ====== */
+async function refresh() {
+  try {
+    const res = await fetch(API);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    parseEvents(data.events || []);
+    lastFetchOk = new Date();
+    $("updated").className = "updated";
+    $("updated").innerHTML = `<span class="dot"></span>Päivitetty ${TIME_FMT.format(lastFetchOk)}${anyLive() ? ' — <span class="badge-live">LIVE</span>' : ""}`;
+  } catch (err) {
+    $("updated").className = "updated err";
+    $("updated").innerHTML = `<span class="dot"></span>Tulospäivitys epäonnistui${lastFetchOk ? " — näytetään klo " + TIME_FMT.format(lastFetchOk) + " tilanne" : ""}`;
+  }
+  renderAll();
+  scheduleNext();
+}
+function anyLive() { return EVENTS.some(e => e.status.type.state === "in"); }
+let timer = null;
+function scheduleNext() {
+  clearTimeout(timer);
+  timer = setTimeout(refresh, anyLive() ? 30000 : 120000);
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
+
+$("prizes").textContent = POOL_DATA.prizes + " · " + POOL_DATA.participants.length + " osallistujaa";
+renderAll();
+refresh();
+</script>
+</body>
+</html>
