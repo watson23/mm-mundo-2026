@@ -60,7 +60,7 @@
   table.board td.rank, table.board th.rank { text-align: left; width: 36px; color: var(--muted); }
   table.board tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
   table.board td.total { font-weight: 700; color: var(--gold); font-size: 16px; }
-  .livepts { color: var(--live); font-weight: 700; font-size: 12px; margin-left: 4px; animation: pulse 1.6s infinite; }
+  .livepts { color: var(--live); font-weight: 700; font-size: 12px; margin-left: 4px; }
   .medal { margin-right: 4px; }
 
   /* matches */
@@ -74,8 +74,9 @@
   .mscore { font-weight: 800; font-size: 16px; min-width: 44px; text-align: center; }
   .mscore.pre { color: var(--muted); font-weight: 400; font-size: 12px; }
   .mstatus { min-width: 40px; text-align: right; font-size: 11px; color: var(--muted); }
-  .badge-live { color: var(--live); font-weight: 800; animation: pulse 1.2s infinite; }
-  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
+  .badge-live { color: var(--live); font-weight: 800; }
+  .livedot { display: inline-block; animation: breathe 2s ease-in-out infinite; }
+  @keyframes breathe { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
   .picks { display: none; padding: 4px 12px 12px; }
   .match.open .picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 5px; }
   .pick { display: flex; justify-content: space-between; padding: 5px 8px; border-radius: 7px; background: var(--panel2); font-size: 13px; }
@@ -564,7 +565,7 @@ function renderMatches(boardRows) {
       const idx = m.row;
       const open = expanded.has(idx) ? " open" : "";
       const score = r.score ? `${r.score[0]}–${r.score[1]}` : TIME_FMT.format(when);
-      const status = r.live ? `<span class="badge-live">● ${esc(r.clock || "LIVE")}</span>` : (r.state === "post" ? "FT" : "");
+      const status = r.live ? `<span class="badge-live"><span class="livedot">●</span> ${esc(r.clock || "LIVE")}</span>` : (r.state === "post" ? "FT" : "");
       h += `<div class="match${open}${r.live ? " islive" : ""}" data-row="${idx}">
         <div class="mrow" onclick="toggleMatch(${idx})">
           <div class="mtime">${TIME_FMT.format(when)}</div>
@@ -589,7 +590,7 @@ function renderSideboard(rows) {
   const confRank = {};
   let lr = 0, ls = null;
   conf.forEach((r, i) => { if (r.total !== ls) { lr = i + 1; ls = r.total; } confRank[r.name] = lr; });
-  let h = `<div class="panel"><h4>📊 Tilanne${anyLive() ? ' <span class="badge-live">● LIVE</span>' : ""}</h4><table class="mini">`;
+  let h = `<div class="panel"><h4>📊 Tilanne${anyLive() ? ' <span class="badge-live"><span class="livedot">●</span> LIVE</span>' : ""}</h4><table class="mini">`;
   for (const r of rows) {
     const d = confRank[r.name] - r.rank;
     const mv = d > 0 ? `<span class="mv up">▲${d}</span>` : d < 0 ? `<span class="mv dn">▼${-d}</span>` : "";
@@ -693,7 +694,7 @@ function renderSpecials(sp) {
           <div class="mtime">${TIME_FMT.format(new Date(e.date))}</div>
           <div class="mteams">${flag(home.team.displayName)}${esc(fi(home.team.displayName))} – ${flag(away.team.displayName)}${esc(fi(away.team.displayName))}</div>
           <div class="mscore${st.state === "pre" ? " pre" : ""}">${esc(score)}</div>
-          <div class="mstatus">${live ? `<span class="badge-live">● ${esc(e.status.displayClock || "LIVE")}</span>` : (st.state === "post" ? esc(st.shortDetail) : DAY_FMT.format(new Date(e.date)))}</div>
+          <div class="mstatus">${live ? `<span class="badge-live"><span class="livedot">●</span> ${esc(e.status.displayClock || "LIVE")}</span>` : (st.state === "post" ? esc(st.shortDetail) : DAY_FMT.format(new Date(e.date)))}</div>
         </div></div>`;
       }
       h += `</div>`;
@@ -718,7 +719,7 @@ async function refresh() {
     parseEvents(data.events || []);
     lastFetchOk = new Date();
     $("updated").className = "updated";
-    $("updated").innerHTML = `<span class="dot"></span>Päivitetty ${TIME_FMT.format(lastFetchOk)}${anyLive() ? ' — <span class="badge-live">LIVE</span>' : ""}`;
+    $("updated").innerHTML = `<span class="dot"></span>Päivitetty ${TIME_FMT.format(lastFetchOk)}${anyLive() ? ' — <span class="badge-live"><span class="livedot">●</span> LIVE</span>' : ""}`;
   } catch (err) {
     $("updated").className = "updated err";
     $("updated").innerHTML = `<span class="dot"></span>Tulospäivitys epäonnistui${lastFetchOk ? " — näytetään klo " + TIME_FMT.format(lastFetchOk) + " tilanne" : ""}`;
