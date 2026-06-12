@@ -318,7 +318,7 @@ function parseEvents(events) {
       id: e.id, date: e.date,
       state: e.status.type.state,              // pre | in | post
       detail: e.status.type.shortDetail,
-      clock: e.status.displayClock,
+      clock: e.status.type.name === "STATUS_HALFTIME" ? "HT" : e.status.displayClock,
       completed: e.status.type.completed,
       homeName: home.team.displayName, awayName: away.team.displayName,
       homeScore: parseInt(home.score || "0", 10), awayScore: parseInt(away.score || "0", 10),
@@ -694,7 +694,7 @@ function renderSpecials(sp) {
           <div class="mtime">${TIME_FMT.format(new Date(e.date))}</div>
           <div class="mteams">${flag(home.team.displayName)}${esc(fi(home.team.displayName))} – ${flag(away.team.displayName)}${esc(fi(away.team.displayName))}</div>
           <div class="mscore${st.state === "pre" ? " pre" : ""}">${esc(score)}</div>
-          <div class="mstatus">${live ? `<span class="badge-live"><span class="livedot">●</span> ${esc(e.status.displayClock || "LIVE")}</span>` : (st.state === "post" ? esc(st.shortDetail) : DAY_FMT.format(new Date(e.date)))}</div>
+          <div class="mstatus">${live ? `<span class="badge-live"><span class="livedot">●</span> ${esc(st.name === "STATUS_HALFTIME" ? "HT" : (e.status.displayClock || "LIVE"))}</span>` : (st.state === "post" ? esc(st.shortDetail) : DAY_FMT.format(new Date(e.date)))}</div>
         </div></div>`;
       }
       h += `</div>`;
