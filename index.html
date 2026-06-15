@@ -178,11 +178,17 @@
   .pspec-v { flex: 1; }
 
   /* group standings */
-  table.gtable { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.gtable { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
   table.gtable td { padding: 7px 4px; border-bottom: 1px solid rgba(42,59,82,.4); text-align: center; }
   table.gtable tr:last-child td { border-bottom: none; }
+  table.gtable td:nth-child(1) { width: 6%; }
+  table.gtable td:nth-child(2) { width: 38%; }
+  table.gtable td:nth-child(3), table.gtable td:nth-child(4),
+  table.gtable td:nth-child(5), table.gtable td:nth-child(6) { width: 8%; }
+  table.gtable td:nth-child(7) { width: 15%; }
+  table.gtable td:nth-child(8) { width: 9%; }
   table.gtable td.gteam { text-align: left; font-weight: 600; }
-  table.gtable td.gpos { color: var(--muted); width: 22px; }
+  table.gtable td.gpos { color: var(--muted); }
   table.gtable td.gpts { font-weight: 700; color: var(--gold); }
   tr.gh td { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .3px; font-weight: 600; }
   tr.grow.q1 td.gpos { box-shadow: inset 3px 0 0 var(--accent); color: var(--accent); font-weight: 700; }
