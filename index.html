@@ -36,7 +36,8 @@
   }
   .wrap { max-width: 980px; margin: 0 auto; padding: 12px 12px 60px; }
   header { text-align: center; padding: 14px 0 6px; }
-  header .logo { width: 116px; height: auto; filter: drop-shadow(0 8px 20px rgba(0,0,0,.55)); margin-bottom: 2px; }
+  header .logo { width: 116px; height: auto; filter: drop-shadow(0 8px 20px rgba(0,0,0,.55)); margin-bottom: 2px; cursor: pointer; transition: transform .15s; }
+  header .logo:hover { transform: scale(1.04); }
   header h1 { margin: 0; font-size: 26px; letter-spacing: 0.5px; }
   .prizes { color: var(--muted); font-size: 13px; margin-top: 4px; }
   .updated { color: var(--muted); font-size: 12px; margin-top: 6px; }
@@ -47,7 +48,9 @@
   nav button {
     flex: 1; padding: 10px 4px; border: 1px solid var(--border); border-radius: 10px;
     background: var(--panel); color: var(--muted); font-size: 14px; font-weight: 600; cursor: pointer;
+    white-space: nowrap;
   }
+  @media (max-width: 480px) { nav { gap: 4px; } nav button { font-size: 13px; padding: 9px 2px; } }
   nav button.active { background: var(--accent); color: #08311c; border-color: var(--accent); }
 
   .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 14px; }
@@ -174,6 +177,21 @@
   .pspec-l { color: var(--muted); font-size: 12px; flex: 0 0 92px; padding-top: 3px; }
   .pspec-v { flex: 1; }
 
+  /* group standings */
+  table.gtable { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.gtable td { padding: 7px 4px; border-bottom: 1px solid rgba(42,59,82,.4); text-align: center; }
+  table.gtable tr:last-child td { border-bottom: none; }
+  table.gtable td.gteam { text-align: left; font-weight: 600; }
+  table.gtable td.gpos { color: var(--muted); width: 22px; }
+  table.gtable td.gpts { font-weight: 700; color: var(--gold); }
+  tr.gh td { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .3px; font-weight: 600; }
+  tr.grow.q1 td.gpos { box-shadow: inset 3px 0 0 var(--accent); color: var(--accent); font-weight: 700; }
+  tr.grow.q3 td.gpos { box-shadow: inset 3px 0 0 var(--gold); color: var(--gold); font-weight: 700; }
+  .glegend { color: var(--muted); font-size: 11px; padding: 0 12px 10px; }
+  .glegend .dot2 { display: inline-block; width: 9px; height: 9px; border-radius: 2px; vertical-align: middle; margin: 0 3px 0 8px; }
+  .glegend .dot2.a { background: var(--accent); }
+  .glegend .dot2.g { background: var(--gold); }
+
   /* matches + live standings side panel */
   .sideboard { display: none; }
   @media (min-width: 920px) {
@@ -199,7 +217,7 @@
 <body>
 <div class="wrap">
   <header>
-    <img src="logo-300.png" alt="" class="logo">
+    <img src="logo-300.png" alt="" class="logo" onclick="setTab('groups')" title="Lohkojen tilanne">
     <h1>MM-Mundo 2026</h1>
     <div class="prizes" id="prizes"></div>
     <div class="updated" id="updated"><span class="dot"></span>Ladataan tuloksia…</div>
@@ -208,12 +226,14 @@
   <nav>
     <button id="tab-board" class="active" onclick="setTab('board')">Tilanne</button>
     <button id="tab-matches" onclick="setTab('matches')">Ottelut</button>
-    <button id="tab-specials" onclick="setTab('specials')">Erikoisveikkaukset</button>
+    <button id="tab-specials" onclick="setTab('specials')">Erikois</button>
+    <button id="tab-groups" onclick="setTab('groups')">Lohkot</button>
   </nav>
 
   <div id="view-board"></div>
   <div id="view-matches" style="display:none"></div>
   <div id="view-specials" style="display:none"></div>
+  <div id="view-groups" style="display:none"></div>
 
   <footer>
     Pisteet lasketaan automaattisesti live-tuloksista (ESPN). Käynnissä olevien otteluiden pisteet ovat alustavia.
@@ -613,7 +633,7 @@ function esc(s) { return String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;"
 
 function setTab(t) {
   activeTab = t;
-  for (const x of ["board", "matches", "specials"]) {
+  for (const x of ["board", "matches", "specials", "groups"]) {
     $("view-" + x).style.display = x === t ? "" : "none";
     $("tab-" + x).classList.toggle("active", x === t);
   }
@@ -800,7 +820,49 @@ function renderAll() {
   renderBoard({ rows });
   renderMatches(rows);
   renderSpecials(sp);
+  renderGroups();
   if (openPlayer) renderPlayerModal();   // keep an open player sheet live
+}
+
+/* ====== World Cup group standings (computed live from results) ====== */
+function computeGroupStandings() {
+  const groups = {};
+  for (const m of POOL_DATA.matches) {
+    const g = m.group;
+    if (!groups[g]) groups[g] = { teams: new Map(), live: false };
+    const G = groups[g];
+    for (const t of [m.home, m.away])
+      if (!G.teams.has(t)) G.teams.set(t, { team: t, P: 0, W: 0, D: 0, L: 0, GF: 0, GA: 0, Pts: 0 });
+    const r = resolveMatch(m);
+    if (!r.score) continue;
+    if (r.live) G.live = true;
+    const [hg, ag] = r.score;
+    const H = G.teams.get(m.home), A = G.teams.get(m.away);
+    H.P++; A.P++; H.GF += hg; H.GA += ag; A.GF += ag; A.GA += hg;
+    if (hg > ag) { H.W++; H.Pts += 3; A.L++; }
+    else if (hg < ag) { A.W++; A.Pts += 3; H.L++; }
+    else { H.D++; A.D++; H.Pts++; A.Pts++; }
+  }
+  return Object.keys(groups).sort().map(g => ({
+    group: g, live: groups[g].live,
+    rows: [...groups[g].teams.values()].sort((a, b) =>
+      b.Pts - a.Pts || (b.GF - b.GA) - (a.GF - a.GA) || b.GF - a.GF || a.team.localeCompare(b.team, "fi")),
+  }));
+}
+
+function renderGroups() {
+  const standings = computeGroupStandings();
+  let h = `<div class="glegend"><span class="dot2 a"></span>2 parasta jatkoon · <span class="dot2 g"></span>3. sija (8 parasta kolmosta jatkoon) · käynnissä olevat ottelut mukana alustavasti</div>`;
+  for (const { group, rows, live } of standings) {
+    h += `<div class="panel"><div class="day">Lohko ${group}${live ? ` <span class="badge-live"><span class="livedot">●</span> LIVE</span>` : ""}</div>`;
+    h += `<table class="gtable"><tr class="gh"><td class="gpos"></td><td class="gteam">Joukkue</td><td>O</td><td>V</td><td>T</td><td>H</td><td>Maalit</td><td class="gpts">P</td></tr>`;
+    rows.forEach((r, i) => {
+      const q = i < 2 ? " q1" : i === 2 ? " q3" : "";
+      h += `<tr class="grow${q}"><td class="gpos">${i + 1}</td><td class="gteam">${flag(r.team)}${esc(fi(r.team))}</td><td>${r.P}</td><td>${r.W}</td><td>${r.D}</td><td>${r.L}</td><td>${r.GF}–${r.GA}</td><td class="gpts">${r.Pts}</td></tr>`;
+    });
+    h += `</table></div>`;
+  }
+  $("view-groups").innerHTML = h;
 }
 
 /* ====== Player detail modal ====== */
