@@ -138,6 +138,42 @@
   .streak.hot { color: #ff9d2e; }
   .streak.cold { color: #7fc8ff; }
 
+  /* clickable rows -> player modal */
+  table.board tbody tr, table.board tr.clk { cursor: pointer; }
+  table.board tr.clk:hover td { background: rgba(90,169,255,.10); }
+  table.mini tr.clk { cursor: pointer; }
+  table.mini tr.clk:hover td { background: rgba(90,169,255,.10); }
+  .namecell { display: inline-flex; align-items: center; gap: 2px; }
+  .namecell .chev { color: var(--muted); font-size: 11px; opacity: .55; margin-left: 4px; }
+
+  /* player modal */
+  .modal { display: none; position: fixed; inset: 0; z-index: 100; background: rgba(4,8,14,.66); padding: 18px 10px; overflow-y: auto; backdrop-filter: blur(2px); }
+  .modal-card { max-width: 680px; margin: 0 auto; background: var(--panel); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 16px 50px rgba(0,0,0,.55); }
+  .modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--panel2); border-radius: 14px 14px 0 0; z-index: 1; }
+  .modal-head h2 { margin: 0; font-size: 20px; }
+  .modal-sub { color: var(--muted); font-size: 13px; margin-top: 3px; }
+  .modal-close { background: none; border: 1px solid var(--border); color: var(--text); border-radius: 9px; width: 34px; height: 34px; font-size: 16px; cursor: pointer; flex-shrink: 0; line-height: 1; }
+  .modal-close:hover { border-color: var(--live); color: var(--live); }
+  .modal-body { padding: 6px 14px 18px; }
+  h3.psec { font-size: 14px; margin: 16px 2px 6px; color: var(--gold); }
+  table.ptable { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.ptable td { padding: 6px 5px; border-bottom: 1px solid rgba(42,59,82,.4); }
+  tr.pt-day td { background: var(--panel2); color: var(--blue); font-weight: 700; font-size: 12px; text-transform: capitalize; }
+  tr.pt-hdr td { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .4px; padding-bottom: 2px; border-bottom: none; }
+  .pt-time { color: var(--muted); width: 40px; white-space: nowrap; }
+  .pt-pick { text-align: center; white-space: nowrap; color: var(--muted); width: 50px; }
+  .pt-res { text-align: center; white-space: nowrap; width: 50px; font-weight: 700; }
+  .pt-res.pre { color: var(--muted); font-weight: 400; }
+  .pt-pts { text-align: right; white-space: nowrap; width: 34px; font-weight: 700; color: var(--muted); }
+  tr.prow.r5 .pt-pts, tr.prow.r4 .pt-pts { color: var(--gold); }
+  tr.prow.r2 .pt-pts { color: var(--accent); }
+  tr.prow.r5, tr.prow.r4 { background: rgba(255,213,74,.06); }
+  tr.prow.r2 { background: rgba(61,220,132,.05); }
+  tr.prow.live .pt-res { color: var(--live); }
+  .pspec { display: flex; gap: 10px; padding: 6px 2px; border-bottom: 1px solid rgba(42,59,82,.4); }
+  .pspec-l { color: var(--muted); font-size: 12px; flex: 0 0 92px; padding-top: 3px; }
+  .pspec-v { flex: 1; }
+
   /* matches + live standings side panel */
   .sideboard { display: none; }
   @media (min-width: 920px) {
@@ -182,6 +218,16 @@
   <footer>
     Pisteet lasketaan automaattisesti live-tuloksista (ESPN). Käynnissä olevien otteluiden pisteet ovat alustavia.
   </footer>
+</div>
+
+<div id="playerModal" class="modal" onclick="if(event.target===this)closePlayer()">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div id="playerModalHead"></div>
+      <button class="modal-close" onclick="closePlayer()" aria-label="Sulje">✕</button>
+    </div>
+    <div class="modal-body" id="playerModalBody"></div>
+  </div>
 </div>
 
 <script src="data.js"></script>
@@ -578,8 +624,9 @@ function renderBoard({ rows }) {
   let h = `<div class="panel"><table class="board">
     <tr><th class="rank">#</th><th class="name">Nimi</th><th>Ottelut</th><th>Erikois</th><th>Yht.</th></tr>`;
   for (const r of rows) {
-    h += `<tr${r.rank <= 3 ? ` class="top${r.rank}"` : ""}><td class="rank">${r.rank}.</td>
-      <td class="name">${medals[r.rank] ? `<span class="medal">${medals[r.rank]}</span>` : ""}${esc(r.name)}${streakBadge(r.streak)}</td>
+    const cls = [r.rank <= 3 ? `top${r.rank}` : "", "clk"].filter(Boolean).join(" ");
+    h += `<tr class="${cls}" onclick="showPlayer('${jsName(r.name)}')"><td class="rank">${r.rank}.</td>
+      <td class="name"><span class="namecell">${medals[r.rank] ? `<span class="medal">${medals[r.rank]}</span>` : ""}${esc(r.name)}${streakBadge(r.streak)}<span class="chev">›</span></span></td>
       <td>${r.matchPts}${r.livePts ? `<span class="livepts">+${r.livePts}</span>` : ""}</td>
       <td>${r.specPts}</td>
       <td class="total">${r.total}${r.livePts ? `<span class="livepts">+${r.livePts}</span>` : ""}</td></tr>`;
@@ -637,7 +684,7 @@ function renderSideboard(rows) {
   for (const r of rows) {
     const d = confRank[r.name] - r.rank;
     const mv = d > 0 ? `<span class="mv up">▲${d}</span>` : d < 0 ? `<span class="mv dn">▼${-d}</span>` : "";
-    h += `<tr><td class="r">${r.rank}.</td><td>${esc(r.name)}${streakBadge(r.streak)}${mv}</td><td class="t">${r.total}${r.livePts ? `<span class="livepts">+${r.livePts}</span>` : ""}</td></tr>`;
+    h += `<tr class="clk" onclick="showPlayer('${jsName(r.name)}')"><td class="r">${r.rank}.</td><td>${esc(r.name)}${streakBadge(r.streak)}${mv}</td><td class="t">${r.total}${r.livePts ? `<span class="livepts">+${r.livePts}</span>` : ""}</td></tr>`;
   }
   return h + `</table></div>`;
 }
@@ -746,11 +793,76 @@ function renderSpecials(sp) {
   $("view-specials").innerHTML = h;
 }
 
+let LAST = null;        // { rows, sp } from the most recent compute, for the player modal
 function renderAll() {
   const { rows, sp } = computeTotals();
+  LAST = { rows, sp };
   renderBoard({ rows });
   renderMatches(rows);
   renderSpecials(sp);
+  if (openPlayer) renderPlayerModal();   // keep an open player sheet live
+}
+
+/* ====== Player detail modal ====== */
+let openPlayer = null;
+function jsName(name) { return name.replace(/\\/g, "\\\\").replace(/'/g, "\\'"); }
+function showPlayer(name) { openPlayer = name; $("playerModal").style.display = "block"; $("playerModal").scrollTop = 0; renderPlayerModal(); }
+function closePlayer() { openPlayer = null; $("playerModal").style.display = "none"; }
+document.addEventListener("keydown", e => { if (e.key === "Escape" && openPlayer) closePlayer(); });
+
+function renderPlayerModal() {
+  if (!openPlayer || !LAST) return;
+  const name = openPlayer;
+  const i = POOL_DATA.participants.indexOf(name);
+  if (i < 0) return;
+  const row = LAST.rows.find(r => r.name === name);
+  const sp = LAST.sp;
+  const live = n => n ? `<span class="livepts">+${n}</span>` : "";
+
+  $("playerModalHead").innerHTML =
+    `<div><h2>${esc(name)}${streakBadge(row.streak)}</h2>
+     <div class="modal-sub">Sija ${row.rank}. · Ottelut ${row.matchPts}${live(row.livePts)} · Erikois ${row.specPts} · Yhteensä <b style="color:var(--gold)">${row.total}${live(row.livePts)}</b></div></div>`;
+
+  // match picks, chronological with day separators
+  const items = POOL_DATA.matches
+    .map(m => { const r = resolveMatch(m); return { m, r, when: new Date(r.date || m.kickoff) }; })
+    .sort((a, b) => a.when - b.when);
+  let mt = `<table class="ptable"><tr class="pt-hdr"><td></td><td></td><td class="pt-pick">Veikkaus</td><td class="pt-res">Tulos</td><td class="pt-pts">P</td></tr>`;
+  let lastDay = null;
+  for (const { m, r, when } of items) {
+    const day = DAY_FMT.format(when);
+    if (day !== lastDay) { mt += `<tr class="pt-day"><td colspan="5">${esc(day)}</td></tr>`; lastDay = day; }
+    const pick = m.picks[i];
+    const pts = r.score ? matchPoints(pick, r.score) : null;
+    const rcls = pts == null ? "" : ` r${pts}`;
+    mt += `<tr class="prow${rcls}${r.live ? " live" : ""}">
+      <td class="pt-time">${TIME_FMT.format(when)}</td>
+      <td>${flag(m.home)}${esc(m.homeFi)} – ${flag(m.away)}${esc(m.awayFi)}</td>
+      <td class="pt-pick">${pick ? pick[0] + "–" + pick[1] : "—"}</td>
+      <td class="pt-res${r.score ? "" : " pre"}">${r.score ? r.score[0] + "–" + r.score[1] : "–"}${r.live ? ` <span class="badge-live"><span class="livedot">●</span></span>` : ""}</td>
+      <td class="pt-pts">${pts == null ? "" : (pts ? "+" + pts : "0")}</td>
+    </tr>`;
+  }
+  mt += `</table>`;
+
+  // specials
+  const det = sp.per[name].detail;
+  const teamChip = (x, decided) => `<span class="chip ${x.hit ? "hit" + (x.got > 10 ? " bonus" : "") : (decided ? "miss" : "")}">${flag(x.team)}${esc(fi(x.team))}${x.hit ? " +" + x.got : ""}</span>`;
+  const medalChip = (x, actual) => `<span class="chip ${x.hit ? "hit bonus" : (actual ? "miss" : "")}">${x.pick ? flag(x.pick) : ""}${esc(x.pick ? fi(x.pick) : "—")} (${x.potential || ""})${x.hit ? " +" + x.got : ""}</span>`;
+  const scorerChip = (x, extra = "") => `<span class="chip ${x.hit ? "hit" : ""}">${esc(x.pick || "—")}${x.hit ? " +" + x.got : ""}</span>${extra}`;
+  const specRow = (label, val) => `<div class="pspec"><div class="pspec-l">${label}</div><div class="pspec-v">${val}</div></div>`;
+
+  let sps = `<h3 class="psec">Erikoisveikkaukset (${sp.per[name].pts} p)</h3>`;
+  sps += specRow("8 parasta", det.top8.map(x => teamChip(x, sp.qfTeams.size >= 8)).join(""));
+  sps += specRow("4 parasta", det.top4.map(x => teamChip(x, sp.sfTeams.size >= 4)).join(""));
+  sps += specRow("Maali välierissä", scorerChip(det.semiScorer));
+  sps += specRow("Maalikuningas", scorerChip(det.topScorer, det.topScorer.leading ? ` <span class="note" style="margin:0">johdossa 👀</span>` : ""));
+  sps += specRow("Pronssi", medalChip(det.bronze, sp.bronzeWinner));
+  sps += specRow("Hopea", medalChip(det.finalLoser, sp.finalLoser));
+  sps += specRow("Mestari", medalChip(det.champion, sp.champion));
+
+  $("playerModalBody").innerHTML =
+    `<h3 class="psec">Otteluveikkaukset</h3>${mt}${sps}`;
 }
 
 /* ====== Refresh loop ====== */
