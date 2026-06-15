@@ -26,6 +26,7 @@
     --blue: #5aa9ff;
   }
   * { box-sizing: border-box; }
+  html, body { overflow-x: clip; }
   body {
     margin: 0;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -46,11 +47,11 @@
 
   nav { display: flex; gap: 6px; margin: 16px 0 14px; position: sticky; top: 0; background: var(--bg); padding: 8px 0; z-index: 10; }
   nav button {
-    flex: 1; padding: 10px 4px; border: 1px solid var(--border); border-radius: 10px;
+    flex: 1; min-width: 0; padding: 10px 4px; border: 1px solid var(--border); border-radius: 10px;
     background: var(--panel); color: var(--muted); font-size: 14px; font-weight: 600; cursor: pointer;
-    white-space: nowrap;
   }
   @media (max-width: 480px) { nav { gap: 4px; } nav button { font-size: 13px; padding: 9px 2px; } }
+  @media (max-width: 360px) { nav button { font-size: 12px; padding: 9px 1px; } }
   nav button.active { background: var(--accent); color: #08311c; border-color: var(--accent); }
 
   .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 14px; }
@@ -93,6 +94,7 @@
 
   /* specials */
   h3.sec { margin: 18px 4px 8px; font-size: 15px; }
+  .panel-scroll { overflow-x: auto; }
   .spec-table { width: 100%; border-collapse: collapse; font-size: 13px; }
   .spec-table th, .spec-table td { padding: 7px 9px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
   .spec-table th { color: var(--muted); font-size: 11px; text-transform: uppercase; }
@@ -737,7 +739,7 @@ function renderSpecials(sp) {
   let h = "";
 
   h += `<h3 class="sec">8 parasta <span class="note">(10 p / oikea joukkue, +10 p bonus jos ei ennakkosuosikki)</span></h3>`;
-  h += `<div class="panel"><table class="spec-table"><tr><th>Nimi</th><th>Veikkaus</th><th style="text-align:right">P</th></tr>`;
+  h += `<div class="panel panel-scroll"><table class="spec-table"><tr><th>Nimi</th><th>Veikkaus</th><th style="text-align:right">P</th></tr>`;
   for (const p of POOL_DATA.participants) {
     const d = sp.per[p].detail.top8;
     h += `<tr><td><b>${esc(p)}</b></td><td>${d.map(x => `<span class="chip ${x.hit ? "hit" + (x.got > 10 ? " bonus" : "") : (sp.qfTeams.size >= 8 ? "miss" : "")}">${flag(x.team)}${esc(fi(x.team))}</span>`).join("")}</td><td class="pts">${d.reduce((a, x) => a + x.got, 0) || ""}</td></tr>`;
@@ -746,7 +748,7 @@ function renderSpecials(sp) {
   h += sp.qfTeams.size ? `<div class="note">Puolivälierissä varmistuneet: ${[...sp.qfTeams].map(t => flag(t) + esc(fi(t))).join(", ")}</div>` : `<div class="note">Ratkeaa kun puolivälieräparit selviävät.</div>`;
 
   h += `<h3 class="sec">4 parasta <span class="note">(samat säännöt)</span></h3>`;
-  h += `<div class="panel"><table class="spec-table"><tr><th>Nimi</th><th>Veikkaus</th><th style="text-align:right">P</th></tr>`;
+  h += `<div class="panel panel-scroll"><table class="spec-table"><tr><th>Nimi</th><th>Veikkaus</th><th style="text-align:right">P</th></tr>`;
   for (const p of POOL_DATA.participants) {
     const d = sp.per[p].detail.top4;
     h += `<tr><td><b>${esc(p)}</b></td><td>${d.map(x => `<span class="chip ${x.hit ? "hit" + (x.got > 10 ? " bonus" : "") : (sp.sfTeams.size >= 4 ? "miss" : "")}">${flag(x.team)}${esc(fi(x.team))}</span>`).join("")}</td><td class="pts">${d.reduce((a, x) => a + x.got, 0) || ""}</td></tr>`;
@@ -754,7 +756,7 @@ function renderSpecials(sp) {
   h += `</table></div>`;
 
   h += `<h3 class="sec">Maaliveikkaukset</h3>`;
-  h += `<div class="panel"><table class="spec-table">
+  h += `<div class="panel panel-scroll"><table class="spec-table">
     <tr><th>Nimi</th><th>Tekee maalin välierissä (10 p)</th><th>Maalikuningas (10 p)</th><th style="text-align:right">P</th></tr>`;
   for (const p of POOL_DATA.participants) {
     const d = sp.per[p].detail;
@@ -773,7 +775,7 @@ function renderSpecials(sp) {
   }
 
   h += `<h3 class="sec">Mitaliveikkaukset <span class="note">(suursuosikit 10 p · Saksa 15 p · Hollanti/Belgia 20 p · muut 40 p)</span></h3>`;
-  h += `<div class="panel"><table class="spec-table">
+  h += `<div class="panel panel-scroll"><table class="spec-table">
     <tr><th>Nimi</th><th>Pronssi</th><th>Hopea</th><th>Mestari</th><th style="text-align:right">P</th></tr>`;
   for (const p of POOL_DATA.participants) {
     const d = sp.per[p].detail;
