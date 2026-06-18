@@ -288,6 +288,8 @@ function matchPoints(pick, res) {
   }
   return Math.sign(pick[0] - pick[1]) === Math.sign(res[0] - res[1]) ? 2 : 0;
 }
+// shown wherever match points appear, so the 1–0 (4p) vs 3–0 (5p) rule is explained
+const SCORING_HTML = '<b>Pisteytys:</b> täysin oikea tulos <b>5 p</b> · tulokset 1–0, 1–1 ja 0–1 <b>4 p</b> · pelkkä oikea merkki (1/X/2) <b>2 p</b>.';
 
 /* ====== Name helpers ====== */
 const FI_NAME = {};                       // English -> Finnish
@@ -698,7 +700,7 @@ function renderMatches(boardRows) {
     h += "</div>";
   }
   $("view-matches").innerHTML =
-    `<div class="hint">Napauta ottelua nähdäksesi kaikkien veikkaukset. 🟡 = oikea tulos, 🟢 = oikea merkki.</div>` +
+    `<div class="hint">${SCORING_HTML} Napauta ottelua nähdäksesi kaikkien veikkaukset.</div>` +
     `<div class="mwrap"><div class="mlist">${h}</div><aside class="sideboard">${renderSideboard(boardRows)}</aside></div>`;
 }
 
@@ -932,7 +934,7 @@ function renderPlayerModal() {
   sps += specRow("Mestari", medalChip(det.champion, sp.champion));
 
   $("playerModalBody").innerHTML =
-    `<h3 class="psec">Otteluveikkaukset</h3>${mt}${sps}`;
+    `<h3 class="psec">Otteluveikkaukset</h3><div class="hint" style="padding:0 2px 8px">${SCORING_HTML}</div>${mt}${sps}`;
 }
 
 /* ====== Refresh loop ====== */
