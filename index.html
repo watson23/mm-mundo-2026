@@ -776,7 +776,10 @@ function renderMatches(boardRows) {
   }
   if (matchFilter !== "done") h += renderPlayoffSchedule();
 
-  const pill = (f, label) => `<button class="fpill${matchFilter === f ? " on" : ""}" onclick="setMatchFilter('${f}')">${label}${f === "upcoming" && counts.live ? ` <span class="livedot" style="color:var(--live)">●</span>` : ""} <span class="fcount">${counts[f]}</span></button>`;
+  // Tulevat & Kaikki also render the playoff schedule below, so include those fixtures in the counts
+  const koCount = KO_EVENTS.length;
+  const pillCount = { upcoming: counts.upcoming + koCount, done: counts.done, all: counts.all + koCount };
+  const pill = (f, label) => `<button class="fpill${matchFilter === f ? " on" : ""}" onclick="setMatchFilter('${f}')">${label}${f === "upcoming" && counts.live ? ` <span class="livedot" style="color:var(--live)">●</span>` : ""} <span class="fcount">${pillCount[f]}</span></button>`;
   const filterBar = `<div class="filterbar">${pill("upcoming", "Tulevat")}${pill("done", "Pelatut")}${pill("all", "Kaikki")}</div>`;
 
   $("view-matches").innerHTML =
