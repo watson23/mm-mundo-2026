@@ -91,6 +91,11 @@
   .pick.p0 { color: var(--muted); }
   .pick.live { outline: 1px dashed var(--live); }
   .hint { color: var(--muted); font-size: 11px; padding: 0 12px 10px; }
+  .filterbar { display: flex; gap: 6px; margin: 0 0 12px; }
+  .fpill { flex: 1; min-width: 0; padding: 7px 4px; border: 1px solid var(--border); border-radius: 999px; background: var(--panel); color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: color .15s, border-color .15s; }
+  .fpill:hover { color: var(--text); }
+  .fpill.on { background: var(--panel2); color: var(--text); border-color: var(--blue); }
+  .fpill .fcount { font-size: 11px; opacity: .65; font-weight: 700; }
 
   /* specials */
   h3.sec { margin: 18px 4px 8px; font-size: 15px; }
@@ -668,20 +673,37 @@ function renderBoard({ rows }) {
 const DAY_FMT = new Intl.DateTimeFormat("fi-FI", { weekday: "short", day: "numeric", month: "numeric", timeZone: "Europe/Helsinki" });
 const TIME_FMT = new Intl.DateTimeFormat("fi-FI", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Helsinki" });
 
+let matchFilter = "upcoming";   // 'upcoming' (live+tulevat) | 'done' | 'all'
+function setMatchFilter(f) { matchFilter = f; renderMatches(LAST ? LAST.rows : []); }
+
 function renderMatches(boardRows) {
-  const byDay = new Map();
-  for (const m of POOL_DATA.matches) {
+  const all = POOL_DATA.matches.map(m => {
     const r = resolveMatch(m);
     const when = new Date(r.date || m.kickoff.replace("Z", ":00Z").replace("::", ":"));
-    const day = DAY_FMT.format(when);
-    if (!byDay.has(day)) byDay.set(day, []);
-    byDay.get(day).push({ m, r, when });
+    return { m, r, when, day: DAY_FMT.format(when) };
+  });
+  const counts = {
+    upcoming: all.filter(x => x.r.state !== "post").length,
+    done: all.filter(x => x.r.state === "post").length,
+    all: all.length,
+    live: all.filter(x => x.r.live).length,
+  };
+
+  let items = matchFilter === "upcoming" ? all.filter(x => x.r.state !== "post")
+            : matchFilter === "done" ? all.filter(x => x.r.state === "post")
+            : all.slice();
+  const reverse = matchFilter === "done";   // newest finished first
+  items.sort((a, b) => reverse ? b.when - a.when : a.when - b.when);
+
+  const byDay = new Map();
+  for (const it of items) {
+    if (!byDay.has(it.day)) byDay.set(it.day, []);
+    byDay.get(it.day).push(it);
   }
   let h = "";
-  for (const [day, items] of byDay) {
+  for (const [day, dayItems] of byDay) {
     h += `<div class="panel"><div class="day">${esc(day)}</div>`;
-    items.sort((a, b) => a.when - b.when);
-    for (const { m, r, when } of items) {
+    for (const { m, r, when } of dayItems) {
       const idx = m.row;
       const open = expanded.has(idx) ? " open" : "";
       const score = r.score ? `${r.score[0]}–${r.score[1]}` : TIME_FMT.format(when);
@@ -699,8 +721,16 @@ function renderMatches(boardRows) {
     }
     h += "</div>";
   }
+  if (!items.length) {
+    h = `<div class="panel"><div style="padding:16px 12px;color:var(--muted)">${matchFilter === "upcoming" ? "Kaikki ottelut on pelattu! 🏆" : "Ei vielä pelattuja otteluita."}</div></div>`;
+  }
+
+  const pill = (f, label) => `<button class="fpill${matchFilter === f ? " on" : ""}" onclick="setMatchFilter('${f}')">${label}${f === "upcoming" && counts.live ? ` <span class="livedot" style="color:var(--live)">●</span>` : ""} <span class="fcount">${counts[f]}</span></button>`;
+  const filterBar = `<div class="filterbar">${pill("upcoming", "Tulevat")}${pill("done", "Pelatut")}${pill("all", "Kaikki")}</div>`;
+
   $("view-matches").innerHTML =
     `<div class="hint">${SCORING_HTML} Napauta ottelua nähdäksesi kaikkien veikkaukset.</div>` +
+    filterBar +
     `<div class="mwrap"><div class="mlist">${h}</div><aside class="sideboard">${renderSideboard(boardRows)}</aside></div>`;
 }
 
