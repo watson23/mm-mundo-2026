@@ -506,13 +506,18 @@ function koSideName(displayName) {
   return `<span class="ko-tbd">${esc(n)}</span>`;
 }
 
-// full knockout schedule for the bottom of the Ottelut list
-function renderPlayoffSchedule() {
+// knockout schedule for the Ottelut list. mode: 'upcoming' (live+tulevat) | 'done' | 'all'.
+// 'done' lists newest round first so the latest results sit on top.
+function renderPlayoffSchedule(mode) {
   if (!KO_EVENTS.length) return "";
   const ko = koInfo();
-  let h = `<h3 class="sec" style="margin-top:22px">🏆 Pudotuspelit</h3>`;
-  for (const r of ["r32", "r16", "qf", "sf", "bronze", "final"]) {
-    const evs = (ko[r] || []).slice().sort((a, b) => a.date.localeCompare(b.date));
+  const keep = e => mode === "all" ? true : mode === "done" ? e.status.type.state === "post" : e.status.type.state !== "post";
+  let order = ["r32", "r16", "qf", "sf", "bronze", "final"];
+  if (mode === "done") order = order.slice().reverse();
+  let h = "";
+  for (const r of order) {
+    let evs = (ko[r] || []).filter(keep).slice().sort((a, b) => a.date.localeCompare(b.date));
+    if (mode === "done") evs.reverse();
     if (!evs.length) continue;
     const anyLive = evs.some(e => e.status.type.state === "in");
     h += `<div class="panel ko"><div class="day">${ROUND_FI[r]}${anyLive ? ` <span class="badge-live"><span class="livedot">●</span> LIVE</span>` : ""}</div>`;
@@ -531,7 +536,7 @@ function renderPlayoffSchedule() {
     }
     h += `</div>`;
   }
-  return h;
+  return h ? `<h3 class="sec" style="margin-top:22px">🏆 Pudotuspelit</h3>${h}` : "";
 }
 
 function koInfo() {
@@ -769,23 +774,25 @@ function renderMatches(boardRows) {
     }
     h += "</div>";
   }
-  if (!items.length) {
-    h = matchFilter === "done"
-      ? `<div class="panel"><div style="padding:16px 12px;color:var(--muted)">Ei vielä pelattuja otteluita.</div></div>`
-      : "";   // upcoming/all: the playoff schedule below still has content
+  if (!items.length) h = "";
+  // playoffs at the bottom for Tulevat/Kaikki; at the top for Pelatut (newest results first)
+  let body = matchFilter === "done"
+    ? renderPlayoffSchedule("done") + h
+    : h + renderPlayoffSchedule(matchFilter);
+  if (!body) {
+    body = `<div class="panel"><div style="padding:16px 12px;color:var(--muted)">${matchFilter === "done" ? "Ei vielä pelattuja otteluita." : "Kaikki ottelut on pelattu! 🏆"}</div></div>`;
   }
-  if (matchFilter !== "done") h += renderPlayoffSchedule();
 
-  // Tulevat & Kaikki also render the playoff schedule below, so include those fixtures in the counts
-  const koCount = KO_EVENTS.length;
-  const pillCount = { upcoming: counts.upcoming + koCount, done: counts.done, all: counts.all + koCount };
+  // counts mirror what each view actually renders, playoff fixtures included
+  const koDone = KO_EVENTS.filter(e => e.status.type.state === "post").length;
+  const pillCount = { upcoming: counts.upcoming + (KO_EVENTS.length - koDone), done: counts.done + koDone, all: counts.all + KO_EVENTS.length };
   const pill = (f, label) => `<button class="fpill${matchFilter === f ? " on" : ""}" onclick="setMatchFilter('${f}')">${label}${f === "upcoming" && counts.live ? ` <span class="livedot" style="color:var(--live)">●</span>` : ""} <span class="fcount">${pillCount[f]}</span></button>`;
   const filterBar = `<div class="filterbar">${pill("upcoming", "Tulevat")}${pill("done", "Pelatut")}${pill("all", "Kaikki")}</div>`;
 
   $("view-matches").innerHTML =
     `<div class="hint">${SCORING_HTML} Napauta ottelua nähdäksesi kaikkien veikkaukset.</div>` +
     filterBar +
-    `<div class="mwrap"><div class="mlist">${h}</div><aside class="sideboard">${renderSideboard(boardRows)}</aside></div>`;
+    `<div class="mwrap"><div class="mlist">${body}</div><aside class="sideboard">${renderSideboard(boardRows)}</aside></div>`;
 }
 
 function renderSideboard(rows) {
