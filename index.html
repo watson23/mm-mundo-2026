@@ -111,6 +111,9 @@
   .note { color: var(--muted); font-size: 12px; margin: 6px 4px 14px; }
   .scorerlist { font-size: 13px; color: var(--muted); margin: 4px; }
   .ko .mrow { cursor: default; }
+  .ko .day { text-transform: none; }
+  .ko .mtime { width: 56px; white-space: normal; line-height: 1.25; flex-shrink: 0; }
+  .ko-tbd { color: var(--muted); font-weight: 500; font-style: italic; }
   .roundname { padding: 8px 12px; background: var(--panel2); font-weight: 700; font-size: 13px; color: var(--gold); border-bottom: 1px solid var(--border); }
 
   footer { text-align: center; color: var(--muted); font-size: 11px; margin-top: 26px; }
@@ -484,7 +487,52 @@ function koRoundName(idx, total, e) {
   if (idx < 30) return "sf";
   return idx === total - 2 ? "bronze" : "final";
 }
-const ROUND_FI = { r32: "Pudotuspelit – 32 parasta", r16: "Neljännesvälierät (16 parasta)", qf: "Puolivälierät (8 parasta)", sf: "Välierät", bronze: "Pronssiottelu", final: "Loppuottelu" };
+const ROUND_FI = { r32: "32 parasta", r16: "16 parasta", qf: "Puolivälierät", sf: "Välierät", bronze: "Pronssiottelu", final: "Loppuottelu" };
+
+// turn an ESPN placeholder ("Group A Winner", "Round of 32 1 Winner") into a Finnish label,
+// or render the real team with flag once it's settled
+function koSideName(displayName) {
+  if (REAL_TEAMS.has(displayName)) return `${flag(displayName)}${esc(fi(displayName))}`;
+  const n = displayName || "";
+  let m;
+  if (m = n.match(/^Group ([A-L]) Winner$/)) return `<span class="ko-tbd">Lohkon ${m[1]} voittaja</span>`;
+  if (m = n.match(/^Group ([A-L]) 2nd Place$/)) return `<span class="ko-tbd">Lohkon ${m[1]} kakkonen</span>`;
+  if (m = n.match(/^Third Place Group ([A-Z/]+)$/)) return `<span class="ko-tbd">3. sija (${m[1]})</span>`;
+  if (m = n.match(/^Round of 32 (\d+) Winner$/)) return `<span class="ko-tbd">32 par. ottelu ${m[1]}</span>`;
+  if (m = n.match(/^Round of 16 (\d+) Winner$/)) return `<span class="ko-tbd">16 par. ottelu ${m[1]}</span>`;
+  if (m = n.match(/^Quarterfinal (\d+) Winner$/)) return `<span class="ko-tbd">Puolivälierä ${m[1]}</span>`;
+  if (m = n.match(/^Semifinal (\d+) Winner$/)) return `<span class="ko-tbd">Välierä ${m[1]} voittaja</span>`;
+  if (m = n.match(/^Semifinal (\d+) Loser$/)) return `<span class="ko-tbd">Välierä ${m[1]} häviäjä</span>`;
+  return `<span class="ko-tbd">${esc(n)}</span>`;
+}
+
+// full knockout schedule for the bottom of the Ottelut list
+function renderPlayoffSchedule() {
+  if (!KO_EVENTS.length) return "";
+  const ko = koInfo();
+  let h = `<h3 class="sec" style="margin-top:22px">🏆 Pudotuspelit</h3>`;
+  for (const r of ["r32", "r16", "qf", "sf", "bronze", "final"]) {
+    const evs = (ko[r] || []).slice().sort((a, b) => a.date.localeCompare(b.date));
+    if (!evs.length) continue;
+    const anyLive = evs.some(e => e.status.type.state === "in");
+    h += `<div class="panel ko"><div class="day">${ROUND_FI[r]}${anyLive ? ` <span class="badge-live"><span class="livedot">●</span> LIVE</span>` : ""}</div>`;
+    for (const e of evs) {
+      const c = e.competitions[0];
+      const home = c.competitors.find(x => x.homeAway === "home"), away = c.competitors.find(x => x.homeAway === "away");
+      const st = e.status.type, live = st.state === "in", when = new Date(e.date);
+      const score = st.state === "pre" ? "" : `${home.score}–${away.score}`;
+      const status = live ? `<span class="badge-live"><span class="livedot">●</span> ${esc(st.name === "STATUS_HALFTIME" ? "HT" : (e.status.displayClock || "LIVE"))}</span>` : (st.state === "post" ? esc(st.shortDetail || "FT") : "");
+      h += `<div class="match ko${live ? " islive" : ""}"><div class="mrow">
+        <div class="mtime">${DAY_FMT.format(when)}<br>${TIME_FMT.format(when)}</div>
+        <div class="mteams">${koSideName(home.team.displayName)} – ${koSideName(away.team.displayName)}</div>
+        <div class="mscore${score ? "" : " pre"}">${score || "–"}</div>
+        <div class="mstatus">${status}</div>
+      </div></div>`;
+    }
+    h += `</div>`;
+  }
+  return h;
+}
 
 function koInfo() {
   const out = { r32: [], r16: [], qf: [], sf: [], bronze: [], final: [] };
@@ -722,8 +770,11 @@ function renderMatches(boardRows) {
     h += "</div>";
   }
   if (!items.length) {
-    h = `<div class="panel"><div style="padding:16px 12px;color:var(--muted)">${matchFilter === "upcoming" ? "Kaikki ottelut on pelattu! 🏆" : "Ei vielä pelattuja otteluita."}</div></div>`;
+    h = matchFilter === "done"
+      ? `<div class="panel"><div style="padding:16px 12px;color:var(--muted)">Ei vielä pelattuja otteluita.</div></div>`
+      : "";   // upcoming/all: the playoff schedule below still has content
   }
+  if (matchFilter !== "done") h += renderPlayoffSchedule();
 
   const pill = (f, label) => `<button class="fpill${matchFilter === f ? " on" : ""}" onclick="setMatchFilter('${f}')">${label}${f === "upcoming" && counts.live ? ` <span class="livedot" style="color:var(--live)">●</span>` : ""} <span class="fcount">${counts[f]}</span></button>`;
   const filterBar = `<div class="filterbar">${pill("upcoming", "Tulevat")}${pill("done", "Pelatut")}${pill("all", "Kaikki")}</div>`;
