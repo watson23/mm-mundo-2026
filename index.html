@@ -223,6 +223,9 @@
   .clinch.adv { color: var(--accent); }
   .day.clickable { cursor: pointer; display: flex; align-items: center; }
   .day .gchev { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--muted); }
+  .gmatches-wrap { max-height: 0; overflow: hidden; transition: max-height .28s ease; }
+  .gmatches-wrap.open { max-height: 460px; }
+  @media (prefers-reduced-motion: reduce) { .gmatches-wrap { transition: none; } }
   .gmatches { border-bottom: 1px solid var(--border); background: rgba(0,0,0,.12); }
   .gmatch { display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-bottom: 1px solid rgba(42,59,82,.4); font-size: 13px; }
   .gmatch:last-child { border-bottom: none; }
@@ -1095,8 +1098,8 @@ function renderGroups() {
   let h = `<div class="glegend"><span class="dot2 a"></span>2 parasta jatkoon · <span class="dot2 g"></span>3. sija (8 parasta kolmosta jatkoon) · <span class="clinch win">🏆</span> lohkovoitto varma · <span class="clinch adv">✓</span> jatkopaikka varma</div>`;
   for (const { group, rows, live } of standings) {
     const open = expandedGroups.has(group);
-    h += `<div class="panel"><div class="day clickable" onclick="toggleGroup('${group}')">Lohko ${group}${live ? ` <span class="badge-live"><span class="livedot">●</span> LIVE</span>` : ""}<span class="gchev">${open ? "▾ ottelut" : "▸ ottelut"}</span></div>`;
-    if (open) h += groupMatchesHtml(group);
+    h += `<div class="panel"><div class="day clickable" onclick="toggleGroup('${group}')">Lohko ${group}${live ? ` <span class="badge-live"><span class="livedot">●</span> LIVE</span>` : ""}<span class="gchev" data-gm="${group}">${open ?"▾ ottelut" : "▸ ottelut"}</span></div>`;
+    h += `<div class="gmatches-wrap${open ? " open" : ""}" data-gm="${group}"><div class="gmatches-inner">${groupMatchesHtml(group)}</div></div>`;
     h += `<table class="gtable"><tr class="gh"><td class="gpos"></td><td class="gteam">Joukkue</td><td>O</td><td>V</td><td>T</td><td>H</td><td>Maalit</td><td class="gpts">P</td></tr>`;
     rows.forEach((r, i) => {
       const q = i < 2 ? " q1" : i === 2 ? " q3" : "";
@@ -1110,7 +1113,13 @@ function renderGroups() {
 }
 
 const expandedGroups = new Set();
-function toggleGroup(g) { if (expandedGroups.has(g)) expandedGroups.delete(g); else expandedGroups.add(g); renderGroups(); }
+function toggleGroup(g) {
+  const open = !expandedGroups.has(g);
+  if (open) expandedGroups.add(g); else expandedGroups.delete(g);
+  document.querySelector(`.gmatches-wrap[data-gm="${g}"]`)?.classList.toggle("open", open);
+  const chev = document.querySelector(`.gchev[data-gm="${g}"]`);
+  if (chev) chev.textContent = open ? "▾ ottelut" : "▸ ottelut";
+}
 
 // all matches of a group (chronological) shown above its standings
 function groupMatchesHtml(group) {
