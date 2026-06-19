@@ -993,24 +993,43 @@ function renderAll() {
 }
 
 /* ====== World Cup group standings (computed live from results) ====== */
-// Sound clinch check: brute-force every outcome of the group's undecided games (live games
-// count as undecided). Ties are counted against the team, so we only ever claim a clinch that
-// is mathematically certain. cPts = points already secured (finished games only).
-function groupClinches(teams, cPts, remaining) {
+// points each team earns in matches played only among `set` (FIFA step-one criterion 1)
+function headToHeadPoints(set, games, outcome) {
+  const s = new Set(set), p = {};
+  set.forEach(t => p[t] = 0);
+  games.forEach((g, i) => {
+    if (!s.has(g.h) || !s.has(g.a)) return;
+    const o = outcome[i];
+    if (o === 0) p[g.h] += 3; else if (o === 1) { p[g.h]++; p[g.a]++; } else p[g.a] += 3;
+  });
+  return p;
+}
+// Sound clinch check: brute-force every outcome of the group's undecided games (live games count
+// as undecided). Ties on points are broken by head-to-head points (FIFA step one); any tie that
+// head-to-head can't resolve is counted against the team, so we only claim a mathematically
+// certain clinch. `games`: [{h,a,fixed}] where fixed is 0|1|2 for played games, null otherwise.
+function groupClinches(teams, games) {
+  const variable = games.map((g, i) => g.fixed === null ? i : -1).filter(i => i >= 0);
   const clinch1st = new Set(teams), clinchTop2 = new Set(teams);
-  const total = 3 ** remaining.length;
+  const total = 3 ** variable.length;
   for (let mask = 0; mask < total; mask++) {
-    const pts = { ...cPts };
+    const outcome = games.map(g => g.fixed);
     let mm = mask;
-    for (const [h, a] of remaining) {
-      const o = mm % 3; mm = (mm - o) / 3;
-      if (o === 0) pts[h] += 3; else if (o === 1) { pts[h] += 1; pts[a] += 1; } else pts[a] += 3;
-    }
+    for (const i of variable) { outcome[i] = mm % 3; mm = (mm - outcome[i]) / 3; }
+    const pts = {};
+    teams.forEach(t => pts[t] = 0);
+    games.forEach((g, i) => { const o = outcome[i]; if (o === 0) pts[g.h] += 3; else if (o === 1) { pts[g.h]++; pts[g.a]++; } else pts[g.a] += 3; });
     for (const t of teams) {
-      let worse = 1;   // worst-case rank: every team tied with or above t counts against it
-      for (const u of teams) if (u !== t && pts[u] >= pts[t]) worse++;
-      if (worse > 1) clinch1st.delete(t);
-      if (worse > 2) clinchTop2.delete(t);
+      let above = 0;
+      const tied = teams.filter(u => pts[u] === pts[t]);
+      const h2h = tied.length > 1 ? headToHeadPoints(tied, games, outcome) : null;
+      for (const u of teams) {
+        if (u === t) continue;
+        if (pts[u] > pts[t]) above++;
+        else if (pts[u] === pts[t] && h2h[u] >= h2h[t]) above++;   // tie unresolved by H2H → against t
+      }
+      if (above >= 1) clinch1st.delete(t);
+      if (above >= 2) clinchTop2.delete(t);
     }
     if (!clinch1st.size && !clinchTop2.size) break;
   }
@@ -1021,7 +1040,7 @@ function computeGroupStandings() {
   const groups = {};
   for (const m of POOL_DATA.matches) {
     const g = m.group;
-    if (!groups[g]) groups[g] = { teams: new Map(), live: false, cPts: {}, remaining: [] };
+    if (!groups[g]) groups[g] = { teams: new Map(), live: false, cPts: {}, games: [] };
     const G = groups[g];
     for (const t of [m.home, m.away])
       if (!G.teams.has(t)) { G.teams.set(t, { team: t, P: 0, W: 0, D: 0, L: 0, GF: 0, GA: 0, Pts: 0 }); G.cPts[t] = 0; }
@@ -1034,19 +1053,20 @@ function computeGroupStandings() {
       else if (hg < ag) { A.W++; A.Pts += 3; H.L++; }
       else { H.D++; A.D++; H.Pts++; A.Pts++; }
     }
-    if (r.state === "post") {   // clinch math only trusts finished games
+    // clinch math only trusts finished games; pre/live are undecided (fixed:null)
+    let fixed = null;
+    if (r.state === "post") {
       const [hg, ag] = r.score;
+      fixed = hg > ag ? 0 : hg < ag ? 2 : 1;
       if (hg > ag) G.cPts[m.home] += 3; else if (hg < ag) G.cPts[m.away] += 3; else { G.cPts[m.home]++; G.cPts[m.away]++; }
-    } else {
-      G.remaining.push([m.home, m.away]);   // pre or live -> undecided
-      if (r.live) G.live = true;
-    }
+    } else if (r.live) G.live = true;
+    G.games.push({ h: m.home, a: m.away, fixed });
   }
   const clinchedWinner = {};
   const standings = Object.keys(groups).sort().map(g => {
     const G = groups[g];
     const teamNames = [...G.teams.keys()];
-    const { clinch1st, clinchTop2 } = groupClinches(teamNames, G.cPts, G.remaining);
+    const { clinch1st, clinchTop2 } = groupClinches(teamNames, G.games);
     clinchedWinner[g] = clinch1st.size === 1 ? [...clinch1st][0] : null;
     const rows = [...G.teams.values()].sort((a, b) =>
       b.Pts - a.Pts || (b.GF - b.GA) - (a.GF - a.GA) || b.GF - a.GF || a.team.localeCompare(b.team, "fi"));
