@@ -111,9 +111,21 @@
   .note { color: var(--muted); font-size: 12px; margin: 6px 4px 14px; }
   .scorerlist { font-size: 13px; color: var(--muted); margin: 4px; }
   .ko .mrow { cursor: default; }
+  .match.ko.clickable .mrow { cursor: pointer; }
   .ko .day { text-transform: none; }
   .ko .mtime { width: 56px; white-space: normal; line-height: 1.25; flex-shrink: 0; }
   .ko-tbd { color: var(--muted); font-weight: 500; font-style: italic; }
+  .koexp { font-size: 10px; color: var(--muted); white-space: nowrap; }
+  .kopicks { display: none; padding: 2px 12px 12px; }
+  .match.ko.open .kopicks { display: block; }
+  .kohint { color: var(--muted); font-size: 11px; margin: 2px 0 8px; }
+  .kosides { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  @media (max-width: 560px) { .kosides { grid-template-columns: 1fr; } }
+  .koside { background: var(--panel2); border-radius: 8px; padding: 8px 10px; }
+  .kosh { font-weight: 700; font-size: 13px; margin-bottom: 5px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+  .kob { font-size: 13px; padding: 2px 0; }
+  .kob .kobets { color: var(--accent); font-size: 11px; }
+  .kob-empty { color: var(--muted); font-size: 12px; font-style: italic; padding: 2px 0; }
   .roundname { padding: 8px 12px; background: var(--panel2); font-weight: 700; font-size: 13px; color: var(--gold); border-bottom: 1px solid var(--border); }
 
   footer { text-align: center; color: var(--muted); font-size: 11px; margin-top: 26px; }
@@ -207,6 +219,8 @@
   .glegend .dot2 { display: inline-block; width: 9px; height: 9px; border-radius: 2px; vertical-align: middle; margin: 0 3px 0 8px; }
   .glegend .dot2.a { background: var(--accent); }
   .glegend .dot2.g { background: var(--gold); }
+  .clinch { font-size: 11px; font-weight: 700; }
+  .clinch.adv { color: var(--accent); }
 
   /* matches + live standings side panel */
   .sideboard { display: none; }
@@ -489,10 +503,36 @@ function koRoundName(idx, total, e) {
 }
 const ROUND_FI = { r32: "32 parasta", r16: "16 parasta", qf: "Puolivälierät", sf: "Välierät", bronze: "Pronssiottelu", final: "Loppuottelu" };
 
+// resolve a knockout slot to a real team: ESPN-assigned, or a group winner we've already
+// proven clinched. Returns the canonical team name, or null if still undetermined.
+function koResolveTeam(displayName) {
+  if (REAL_TEAMS.has(displayName)) return displayName;
+  const cw = (GROUPS && GROUPS.clinchedWinner) || {};
+  const m = (displayName || "").match(/^Group ([A-L]) Winner$/);
+  if (m && cw[m[1]]) return cw[m[1]];
+  return null;
+}
+
+// participants who have a given team in their special bets, with which bets
+function teamSpecialBackers(team) {
+  const s = POOL_DATA.specials, out = [];
+  for (const p of POOL_DATA.participants) {
+    const bets = [];
+    if ((s.top8[p] || []).includes(team)) bets.push("8 parasta");
+    if ((s.top4[p] || []).includes(team)) bets.push("4 parasta");
+    if (s.bronze[p] === team) bets.push("pronssi");
+    if (s.finalLoser[p] === team) bets.push("hopea");
+    if (s.champion[p] === team) bets.push("mestari");
+    if (bets.length) out.push({ name: p, bets });
+  }
+  return out;
+}
+
 // turn an ESPN placeholder ("Group A Winner", "Round of 32 1 Winner") into a Finnish label,
 // or render the real team with flag once it's settled
 function koSideName(displayName) {
-  if (REAL_TEAMS.has(displayName)) return `${flag(displayName)}${esc(fi(displayName))}`;
+  const resolved = koResolveTeam(displayName);
+  if (resolved) return `${flag(resolved)}${esc(fi(resolved))}`;
   const n = displayName || "";
   let m;
   if (m = n.match(/^Group ([A-L]) Winner$/)) return `<span class="ko-tbd">Lohkon ${m[1]} voittaja</span>`;
@@ -527,16 +567,41 @@ function renderPlayoffSchedule(mode) {
       const st = e.status.type, live = st.state === "in", when = new Date(e.date);
       const score = st.state === "pre" ? "" : `${home.score}–${away.score}`;
       const status = live ? `<span class="badge-live"><span class="livedot">●</span> ${esc(st.name === "STATUS_HALFTIME" ? "HT" : (e.status.displayClock || "LIVE"))}</span>` : (st.state === "post" ? esc(st.shortDetail || "FT") : "");
-      h += `<div class="match ko${live ? " islive" : ""}"><div class="mrow">
+      const homeT = koResolveTeam(home.team.displayName), awayT = koResolveTeam(away.team.displayName);
+      const clickable = homeT || awayT;   // can show backers once at least one side is known
+      const open = expandedKo.has(e.id) ? " open" : "";
+      h += `<div class="match ko${live ? " islive" : ""}${clickable ? " clickable" : ""}${open}"${clickable ? ` data-ko="${esc(e.id)}"` : ""}>
+        <div class="mrow"${clickable ? ` onclick="toggleKo('${esc(e.id)}')"` : ""}>
         <div class="mtime">${DAY_FMT.format(when)}<br>${TIME_FMT.format(when)}</div>
-        <div class="mteams">${koSideName(home.team.displayName)} – ${koSideName(away.team.displayName)}</div>
+        <div class="mteams">${koSideName(home.team.displayName)} – ${koSideName(away.team.displayName)}${clickable ? ` <span class="koexp">veikkaukset ›</span>` : ""}</div>
         <div class="mscore${score ? "" : " pre"}">${score || "–"}</div>
         <div class="mstatus">${status}</div>
-      </div></div>`;
+        </div>${clickable ? `<div class="kopicks">${renderKoBackers(home.team.displayName, away.team.displayName, homeT, awayT)}</div>` : ""}
+      </div>`;
     }
     h += `</div>`;
   }
   return h ? `<h3 class="sec" style="margin-top:22px">🏆 Pudotuspelit</h3>${h}` : "";
+}
+
+const expandedKo = new Set();
+function toggleKo(id) {
+  if (expandedKo.has(id)) expandedKo.delete(id); else expandedKo.add(id);
+  document.querySelector(`.match.ko[data-ko="${id}"]`)?.classList.toggle("open");
+}
+
+// who has each team in their special bets — shown when a knockout match is tapped
+function renderKoBackers(homeName, awayName, homeT, awayT) {
+  const side = (displayName, realTeam) => {
+    if (!realTeam) return `<div class="koside"><div class="kosh">${koSideName(displayName)}</div><div class="kob-empty">Joukkue ei vielä selvillä</div></div>`;
+    const backers = teamSpecialBackers(realTeam);
+    const inner = backers.length
+      ? backers.map(b => `<div class="kob"><b>${esc(b.name)}</b> <span class="kobets">${esc(b.bets.join(" · "))}</span></div>`).join("")
+      : `<div class="kob-empty">Ei kenenkään erikoisveikkauksissa</div>`;
+    return `<div class="koside"><div class="kosh">${flag(realTeam)}${esc(fi(realTeam))}</div>${inner}</div>`;
+  };
+  return `<div class="kohint">Ketkä ovat veikanneet näitä joukkueita jatkoon (8/4 parasta, mitalit):</div>
+    <div class="kosides">${side(homeName, homeT)}${side(awayName, awayT)}</div>`;
 }
 
 function koInfo() {
@@ -915,9 +980,11 @@ function renderSpecials(sp) {
 }
 
 let LAST = null;        // { rows, sp } from the most recent compute, for the player modal
+let GROUPS = null;      // { standings, clinchedWinner } shared by Lohkot + playoff schedule
 function renderAll() {
   const { rows, sp } = computeTotals();
   LAST = { rows, sp };
+  GROUPS = computeGroupStandings();
   renderBoard({ rows });
   renderMatches(rows);
   renderSpecials(sp);
@@ -926,40 +993,83 @@ function renderAll() {
 }
 
 /* ====== World Cup group standings (computed live from results) ====== */
+// Sound clinch check: brute-force every outcome of the group's undecided games (live games
+// count as undecided). Ties are counted against the team, so we only ever claim a clinch that
+// is mathematically certain. cPts = points already secured (finished games only).
+function groupClinches(teams, cPts, remaining) {
+  const clinch1st = new Set(teams), clinchTop2 = new Set(teams);
+  const total = 3 ** remaining.length;
+  for (let mask = 0; mask < total; mask++) {
+    const pts = { ...cPts };
+    let mm = mask;
+    for (const [h, a] of remaining) {
+      const o = mm % 3; mm = (mm - o) / 3;
+      if (o === 0) pts[h] += 3; else if (o === 1) { pts[h] += 1; pts[a] += 1; } else pts[a] += 3;
+    }
+    for (const t of teams) {
+      let worse = 1;   // worst-case rank: every team tied with or above t counts against it
+      for (const u of teams) if (u !== t && pts[u] >= pts[t]) worse++;
+      if (worse > 1) clinch1st.delete(t);
+      if (worse > 2) clinchTop2.delete(t);
+    }
+    if (!clinch1st.size && !clinchTop2.size) break;
+  }
+  return { clinch1st, clinchTop2 };
+}
+
 function computeGroupStandings() {
   const groups = {};
   for (const m of POOL_DATA.matches) {
     const g = m.group;
-    if (!groups[g]) groups[g] = { teams: new Map(), live: false };
+    if (!groups[g]) groups[g] = { teams: new Map(), live: false, cPts: {}, remaining: [] };
     const G = groups[g];
     for (const t of [m.home, m.away])
-      if (!G.teams.has(t)) G.teams.set(t, { team: t, P: 0, W: 0, D: 0, L: 0, GF: 0, GA: 0, Pts: 0 });
+      if (!G.teams.has(t)) { G.teams.set(t, { team: t, P: 0, W: 0, D: 0, L: 0, GF: 0, GA: 0, Pts: 0 }); G.cPts[t] = 0; }
     const r = resolveMatch(m);
-    if (!r.score) continue;
-    if (r.live) G.live = true;
-    const [hg, ag] = r.score;
-    const H = G.teams.get(m.home), A = G.teams.get(m.away);
-    H.P++; A.P++; H.GF += hg; H.GA += ag; A.GF += ag; A.GA += hg;
-    if (hg > ag) { H.W++; H.Pts += 3; A.L++; }
-    else if (hg < ag) { A.W++; A.Pts += 3; H.L++; }
-    else { H.D++; A.D++; H.Pts++; A.Pts++; }
+    if (r.score) {   // standings table includes live (provisional) results
+      const [hg, ag] = r.score;
+      const H = G.teams.get(m.home), A = G.teams.get(m.away);
+      H.P++; A.P++; H.GF += hg; H.GA += ag; A.GF += ag; A.GA += hg;
+      if (hg > ag) { H.W++; H.Pts += 3; A.L++; }
+      else if (hg < ag) { A.W++; A.Pts += 3; H.L++; }
+      else { H.D++; A.D++; H.Pts++; A.Pts++; }
+    }
+    if (r.state === "post") {   // clinch math only trusts finished games
+      const [hg, ag] = r.score;
+      if (hg > ag) G.cPts[m.home] += 3; else if (hg < ag) G.cPts[m.away] += 3; else { G.cPts[m.home]++; G.cPts[m.away]++; }
+    } else {
+      G.remaining.push([m.home, m.away]);   // pre or live -> undecided
+      if (r.live) G.live = true;
+    }
   }
-  return Object.keys(groups).sort().map(g => ({
-    group: g, live: groups[g].live,
-    rows: [...groups[g].teams.values()].sort((a, b) =>
-      b.Pts - a.Pts || (b.GF - b.GA) - (a.GF - a.GA) || b.GF - a.GF || a.team.localeCompare(b.team, "fi")),
-  }));
+  const clinchedWinner = {};
+  const standings = Object.keys(groups).sort().map(g => {
+    const G = groups[g];
+    const teamNames = [...G.teams.keys()];
+    const { clinch1st, clinchTop2 } = groupClinches(teamNames, G.cPts, G.remaining);
+    clinchedWinner[g] = clinch1st.size === 1 ? [...clinch1st][0] : null;
+    const rows = [...G.teams.values()].sort((a, b) =>
+      b.Pts - a.Pts || (b.GF - b.GA) - (a.GF - a.GA) || b.GF - a.GF || a.team.localeCompare(b.team, "fi"));
+    rows.forEach(row => {
+      row.clinchWin = clinch1st.has(row.team);
+      row.clinchAdv = clinchTop2.has(row.team) || G.cPts[row.team] >= 6;   // ≥6 secured pts ⇒ top-8 third at worst
+    });
+    return { group: g, live: G.live, rows };
+  });
+  return { standings, clinchedWinner };
 }
 
 function renderGroups() {
-  const standings = computeGroupStandings();
-  let h = `<div class="glegend"><span class="dot2 a"></span>2 parasta jatkoon · <span class="dot2 g"></span>3. sija (8 parasta kolmosta jatkoon) · käynnissä olevat ottelut mukana alustavasti</div>`;
+  const { standings } = GROUPS || computeGroupStandings();
+  let h = `<div class="glegend"><span class="dot2 a"></span>2 parasta jatkoon · <span class="dot2 g"></span>3. sija (8 parasta kolmosta jatkoon) · <span class="clinch win">🏆</span> lohkovoitto varma · <span class="clinch adv">✓</span> jatkopaikka varma</div>`;
   for (const { group, rows, live } of standings) {
     h += `<div class="panel"><div class="day">Lohko ${group}${live ? ` <span class="badge-live"><span class="livedot">●</span> LIVE</span>` : ""}</div>`;
     h += `<table class="gtable"><tr class="gh"><td class="gpos"></td><td class="gteam">Joukkue</td><td>O</td><td>V</td><td>T</td><td>H</td><td>Maalit</td><td class="gpts">P</td></tr>`;
     rows.forEach((r, i) => {
       const q = i < 2 ? " q1" : i === 2 ? " q3" : "";
-      h += `<tr class="grow${q}"><td class="gpos">${i + 1}</td><td class="gteam">${flag(r.team)}${esc(fi(r.team))}</td><td>${r.P}</td><td>${r.W}</td><td>${r.D}</td><td>${r.L}</td><td>${r.GF}–${r.GA}</td><td class="gpts">${r.Pts}</td></tr>`;
+      const badge = r.clinchWin ? ` <span class="clinch win" title="Lohkovoitto varmistettu">🏆</span>`
+                  : r.clinchAdv ? ` <span class="clinch adv" title="Jatkopaikka varmistettu">✓</span>` : "";
+      h += `<tr class="grow${q}"><td class="gpos">${i + 1}</td><td class="gteam">${flag(r.team)}${esc(fi(r.team))}${badge}</td><td>${r.P}</td><td>${r.W}</td><td>${r.D}</td><td>${r.L}</td><td>${r.GF}–${r.GA}</td><td class="gpts">${r.Pts}</td></tr>`;
     });
     h += `</table></div>`;
   }
