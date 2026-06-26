@@ -779,6 +779,7 @@ function esc(s) { return String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;"
 
 function setTab(t) {
   activeTab = t;
+  try { localStorage.setItem("mm_tab", t); } catch (e) {}   // remember across refreshes
   for (const x of ["board", "matches", "specials", "groups"]) {
     $("view-" + x).style.display = x === t ? "" : "none";
     $("tab-" + x).classList.toggle("active", x === t);
@@ -1260,6 +1261,10 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) refr
 
 $("prizes").textContent = POOL_DATA.prizes + " · " + POOL_DATA.participants.length + " osallistujaa";
 renderAll();
+try {   // restore the last viewed tab
+  const saved = localStorage.getItem("mm_tab");
+  if (saved && saved !== "board" && $("view-" + saved)) setTab(saved);
+} catch (e) {}
 refresh();
 </script>
 </body>
