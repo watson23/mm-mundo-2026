@@ -1049,6 +1049,33 @@ function groupClinches(teams, games) {
   return { clinch1st, clinchTop2 };
 }
 
+// mini-table (points/GD/goals) among `set`, using played games only — FIFA step one
+function h2hTable(set, games) {
+  const s = new Set(set), t = {};
+  set.forEach(x => t[x] = { pts: 0, gd: 0, gf: 0 });
+  for (const g of games) {
+    if (g.hg == null || !s.has(g.h) || !s.has(g.a)) continue;
+    t[g.h].gf += g.hg; t[g.h].gd += g.hg - g.ag;
+    t[g.a].gf += g.ag; t[g.a].gd += g.ag - g.hg;
+    if (g.hg > g.ag) t[g.h].pts += 3; else if (g.hg < g.ag) t[g.a].pts += 3; else { t[g.h].pts++; t[g.a].pts++; }
+  }
+  return t;
+}
+// rank a group's rows by full FIFA order: points → head-to-head (pts/GD/goals) → overall GD → goals
+function rankGroup(rows, games) {
+  return rows.slice().sort((A, B) => {
+    if (B.Pts !== A.Pts) return B.Pts - A.Pts;
+    const tied = rows.filter(r => r.Pts === A.Pts).map(r => r.team);
+    if (tied.length > 1) {
+      const h = h2hTable(tied, games);
+      if (h[B.team].pts !== h[A.team].pts) return h[B.team].pts - h[A.team].pts;
+      if (h[B.team].gd !== h[A.team].gd) return h[B.team].gd - h[A.team].gd;
+      if (h[B.team].gf !== h[A.team].gf) return h[B.team].gf - h[A.team].gf;
+    }
+    return (B.GF - B.GA) - (A.GF - A.GA) || B.GF - A.GF || A.team.localeCompare(B.team, "fi");
+  });
+}
+
 function computeGroupStandings() {
   const groups = {};
   for (const m of POOL_DATA.matches) {
@@ -1067,26 +1094,31 @@ function computeGroupStandings() {
       else { H.D++; A.D++; H.Pts++; A.Pts++; }
     }
     // clinch math only trusts finished games; pre/live are undecided (fixed:null)
-    let fixed = null;
+    let fixed = null, hg = null, ag = null;
     if (r.state === "post") {
-      const [hg, ag] = r.score;
+      [hg, ag] = r.score;
       fixed = hg > ag ? 0 : hg < ag ? 2 : 1;
       if (hg > ag) G.cPts[m.home] += 3; else if (hg < ag) G.cPts[m.away] += 3; else { G.cPts[m.home]++; G.cPts[m.away]++; }
     } else if (r.live) G.live = true;
-    G.games.push({ h: m.home, a: m.away, fixed });
+    G.games.push({ h: m.home, a: m.away, fixed, hg, ag });
   }
   const clinchedWinner = {};
   const standings = Object.keys(groups).sort().map(g => {
     const G = groups[g];
-    const teamNames = [...G.teams.keys()];
-    const { clinch1st, clinchTop2 } = groupClinches(teamNames, G.games);
-    clinchedWinner[g] = clinch1st.size === 1 ? [...clinch1st][0] : null;
-    const rows = [...G.teams.values()].sort((a, b) =>
-      b.Pts - a.Pts || (b.GF - b.GA) - (a.GF - a.GA) || b.GF - a.GF || a.team.localeCompare(b.team, "fi"));
-    rows.forEach(row => {
-      row.clinchWin = clinch1st.has(row.team);
-      row.clinchAdv = clinchTop2.has(row.team) || G.cPts[row.team] >= 6;   // ≥6 secured pts ⇒ top-8 third at worst
-    });
+    const rows = rankGroup([...G.teams.values()], G.games);   // FIFA-ordered standings
+    const finalized = G.games.every(gm => gm.fixed !== null);
+    if (finalized) {
+      // group complete — finishing position is exact; no projection needed
+      clinchedWinner[g] = rows[0].team;
+      rows.forEach((row, i) => { row.clinchWin = i === 0; row.clinchAdv = i < 2 || G.cPts[row.team] >= 6; });
+    } else {
+      const { clinch1st, clinchTop2 } = groupClinches([...G.teams.keys()], G.games);
+      clinchedWinner[g] = clinch1st.size === 1 ? [...clinch1st][0] : null;
+      rows.forEach(row => {
+        row.clinchWin = clinch1st.has(row.team);
+        row.clinchAdv = clinchTop2.has(row.team) || G.cPts[row.team] >= 6;   // ≥6 secured pts ⇒ top-8 third at worst
+      });
+    }
     return { group: g, live: G.live, rows };
   });
   return { standings, clinchedWinner };
