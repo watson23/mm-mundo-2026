@@ -1077,6 +1077,29 @@ function rankGroup(rows, games) {
   });
 }
 
+// third-placed teams are ranked across groups by points → GD → goals (no head-to-head)
+function thirdAbove(X, Y) {
+  if (X.Pts !== Y.Pts) return X.Pts > Y.Pts;
+  if (X.GD !== Y.GD) return X.GD > Y.GD;
+  if (X.GF !== Y.GF) return X.GF > Y.GF;
+  return false;   // exactly level → can't guarantee order (disciplinary/lots)
+}
+// max points the eventual 3rd-placed team of an unfinished group could reach
+function maxThirdPoints(G) {
+  const teams = [...G.teams.keys()];
+  const remaining = G.games.filter(g => g.fixed === null);
+  let best = 0;
+  const total = 3 ** remaining.length;
+  for (let mask = 0; mask < total; mask++) {
+    const pts = {}; teams.forEach(t => pts[t] = G.cPts[t]);
+    let mm = mask;
+    for (const g of remaining) { const o = mm % 3; mm = (mm - o) / 3; if (o === 0) pts[g.h] += 3; else if (o === 1) { pts[g.h]++; pts[g.a]++; } else pts[g.a] += 3; }
+    const sorted = teams.map(t => pts[t]).sort((a, b) => b - a);
+    if (sorted[2] > best) best = sorted[2];
+  }
+  return best;
+}
+
 function computeGroupStandings() {
   const groups = {};
   for (const m of POOL_DATA.matches) {
@@ -1120,8 +1143,25 @@ function computeGroupStandings() {
         row.clinchAdv = clinchTop2.has(row.team) || G.cPts[row.team] >= 6;   // ≥6 secured pts ⇒ top-8 third at worst
       });
     }
-    return { group: g, live: G.live, rows };
+    return { group: g, live: G.live, rows, finalized, G };
   });
+
+  // cross-group: which finished 3rd-placed teams have clinched a best-8-thirds spot
+  const finishedThirds = [], unfinishedMaxThird = [];
+  for (const s of standings) {
+    if (s.finalized) { const r = s.rows[2]; finishedThirds.push({ team: r.team, Pts: r.Pts, GD: r.GF - r.GA, GF: r.GF }); }
+    else unfinishedMaxThird.push(maxThirdPoints(s.G));
+  }
+  for (const X of finishedThirds) {
+    let threats = 0;
+    for (const Y of finishedThirds) if (Y !== X && !thirdAbove(X, Y)) threats++;   // Y level-or-above X
+    for (const m of unfinishedMaxThird) if (m >= X.Pts) threats++;                  // group could outscore X
+    if (threats <= 7) {   // ≤7 others can rank above ⇒ X is among the best 8 thirds
+      const row = standings.find(s => s.rows[2] && s.rows[2].team === X.team).rows[2];
+      row.clinchAdv = true;
+    }
+  }
+  standings.forEach(s => { delete s.G; });   // drop internal handle before returning
   return { standings, clinchedWinner };
 }
 
