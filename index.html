@@ -181,6 +181,11 @@
   .modal-close:hover { border-color: var(--live); color: var(--live); }
   .modal-body { padding: 6px 14px 18px; }
   h3.psec { font-size: 14px; margin: 16px 2px 6px; color: var(--gold); }
+  .pstats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 4px 0 10px; }
+  .pstat { background: var(--panel2); border-radius: 9px; padding: 9px 6px; text-align: center; }
+  .pstat-n { font-size: 18px; font-weight: 800; color: var(--gold); font-variant-numeric: tabular-nums; }
+  .pstat-l { font-size: 10px; color: var(--muted); margin-top: 3px; text-transform: uppercase; letter-spacing: .3px; }
+  @media (max-width: 460px) { .pstats { grid-template-columns: repeat(2, 1fr); } }
   table.ptable { width: 100%; border-collapse: collapse; font-size: 13px; }
   table.ptable td { padding: 6px 5px; border-bottom: 1px solid rgba(42,59,82,.4); }
   tr.pt-day td { background: var(--panel2); color: var(--blue); font-weight: 700; font-size: 12px; text-transform: capitalize; }
@@ -1270,7 +1275,33 @@ function renderPlayerModal() {
   sps += specRow("Hopea", medalChip(det.finalLoser, sp.finalLoser));
   sps += specRow("Mestari", medalChip(det.champion, sp.champion));
 
+  // group-stage stats from this person's picks
+  let finished = 0, correctP = 0, exactP = 0, nearP = 0;
+  const freq = {};
+  for (const m of POOL_DATA.matches) {
+    const pick = m.picks[i];
+    if (pick) { const k = pick[0] + "–" + pick[1]; freq[k] = (freq[k] || 0) + 1; }
+    const r = resolveMatch(m);
+    if (r.state !== "post" || !r.score || !pick) continue;
+    finished++;
+    const pts = matchPoints(pick, r.score);
+    if (pts > 0) correctP++;
+    if (pts >= 4) exactP++;
+    if (Math.abs(pick[0] - r.score[0]) + Math.abs(pick[1] - r.score[1]) === 1) nearP++;   // off by one goal
+  }
+  let favScore = "—", favCount = 0;
+  for (const [k, c] of Object.entries(freq)) if (c > favCount) { favCount = c; favScore = k; }
+  const pct = finished ? Math.round(100 * correctP / finished) : 0;
+  const statsHtml = `<h3 class="psec" style="margin-top:6px">Lohkovaiheen tilastot</h3>
+    <div class="pstats">
+      <div class="pstat" title="Oikea lopputulos (väh. 2 p)"><div class="pstat-n">${correctP}/${finished}</div><div class="pstat-l">Osumaa${finished ? ` · ${pct}%` : ""}</div></div>
+      <div class="pstat" title="Täysin oikea tulos"><div class="pstat-n">${exactP}</div><div class="pstat-l">Täysosumaa</div></div>
+      <div class="pstat" title="Yhden maalin päässä oikeasta tuloksesta"><div class="pstat-n">${nearP}</div><div class="pstat-l">Lähellä ±1</div></div>
+      <div class="pstat" title="Useimmin veikkaamasi tulos"><div class="pstat-n">${esc(favScore)}</div><div class="pstat-l">Lempitulos${favCount > 1 ? ` ·&nbsp;${favCount}×` : ""}</div></div>
+    </div>`;
+
   $("playerModalBody").innerHTML =
+    statsHtml +
     `<h3 class="psec">Otteluveikkaukset</h3><div class="hint" style="padding:0 2px 8px">${SCORING_HTML}</div>${mt}${sps}`;
 }
 
