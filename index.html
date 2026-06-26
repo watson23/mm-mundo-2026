@@ -458,12 +458,15 @@ let activeTab = "board";
 
 function pairKey(a, b) { return [a, b].sort().join("|"); }
 
+const GROUP_PAIRS = new Set(POOL_DATA.matches.map(m => pairKey(m.home, m.away)));
+
 function parseEvents(events) {
   EVENTS = events;
   EV_BY_PAIR = {};
   GOALS = {};
   const groupIds = new Set();
-  for (const e of events) {
+  // earliest first, so a group game claims its pair before any later knockout rematch of it
+  for (const e of [...events].sort((a, b) => a.date.localeCompare(b.date))) {
     const c = e.competitions[0];
     const comps = c.competitors || [];
     const home = comps.find(x => x.homeAway === "home");
@@ -490,15 +493,11 @@ function parseEvents(events) {
     }
     if (REAL_TEAMS.has(info.homeName) && REAL_TEAMS.has(info.awayName)) {
       const key = pairKey(info.homeName, info.awayName);
-      if (!(key in EV_BY_PAIR)) { EV_BY_PAIR[key] = info; groupIds.add(e.id); }
+      // only a real group-stage pairing counts as a group match; knockout ties stay in KO_EVENTS
+      if (GROUP_PAIRS.has(key) && !(key in EV_BY_PAIR)) { EV_BY_PAIR[key] = info; groupIds.add(e.id); }
     }
   }
-  // group matches claim their events via pair keys; everything else (or repeats) is knockout
-  KO_EVENTS = events
-    .filter(e => !groupIds.has(e.id) || new Date(e.date) > new Date("2026-06-28T00:00Z"))
-    .map(e => events.find(x => x.id === e.id))
-    .filter(Boolean);
-  // rebuild knockout info objects in chronological order
+  // group matches claimed their events by pair key; everything else is knockout, chronological
   KO_EVENTS = events
     .filter(e => !groupIds.has(e.id))
     .sort((a, b) => a.date.localeCompare(b.date));
