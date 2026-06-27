@@ -93,7 +93,7 @@
   .hint { color: var(--muted); font-size: 11px; padding: 0 12px 10px; }
   .scorers { font-size: 12px; color: var(--muted); padding: 2px 2px 6px; }
   .picks .scorers { grid-column: 1 / -1; border-bottom: 1px solid var(--border); margin-bottom: 3px; }
-  .scorers .goal { opacity: .8; }
+  .scorers .gline { padding: 1px 0; }
   .filterbar { display: flex; gap: 6px; margin: 0 0 12px; }
   .fpill { flex: 1; min-width: 0; padding: 7px 4px; border: 1px solid var(--border); border-radius: 999px; background: var(--panel); color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: color .15s, border-color .15s; }
   .fpill:hover { color: var(--text); }
@@ -509,15 +509,11 @@ function parseEvents(events) {
       homeName: home.team.displayName, awayName: away.team.displayName,
       homeScore: parseInt(home.score || "0", 10), awayScore: parseInt(away.score || "0", 10),
       winner: comps.find(x => x.winner)?.team.displayName || null,
-      scorers: [],
+      goals: extractGoals(c),
     };
-    for (const d of (c.details || [])) {
-      if (d.scoringPlay && !d.ownGoal && !d.shootout) {
-        for (const a of (d.athletesInvolved || []).slice(0, 1)) {
-          info.scorers.push(a.displayName);
-          GOALS[a.displayName] = (GOALS[a.displayName] || 0) + 1;
-        }
-      }
+    for (const d of (c.details || [])) {   // top-scorer tally excludes own goals
+      if (d.scoringPlay && !d.ownGoal && !d.shootout)
+        for (const a of (d.athletesInvolved || []).slice(0, 1)) GOALS[a.displayName] = (GOALS[a.displayName] || 0) + 1;
     }
     if (REAL_TEAMS.has(info.homeName) && REAL_TEAMS.has(info.awayName)) {
       const key = pairKey(info.homeName, info.awayName);
@@ -617,7 +613,7 @@ function renderPlayoffSchedule(mode) {
         <div class="mteams">${koSideName(home.team.displayName)} – ${koSideName(away.team.displayName)}${st.state !== "post" ? koTvBadge(e) : ""}${clickable ? ` <span class="koexp">veikkaukset ›</span>` : ""}</div>
         <div class="mscore${score ? "" : " pre"}">${score || "–"}</div>
         <div class="mstatus">${status}</div>
-        </div>${clickable ? `<div class="kopicks">${st.state !== "pre" ? scorersHtml(scorerNamesFromComp(c)) : ""}${renderKoBackers(home.team.displayName, away.team.displayName, homeT, awayT)}</div>` : ""}
+        </div>${clickable ? `<div class="kopicks">${st.state !== "pre" ? goalsHtml(extractGoals(c)) : ""}${renderKoBackers(home.team.displayName, away.team.displayName, homeT, awayT)}</div>` : ""}
       </div>`;
     }
     h += `</div>`;
@@ -668,24 +664,44 @@ function resolveMatch(m) {
   if (ev && ev.state !== "pre") {
     const swapped = ev.homeName !== m.home;
     const score = swapped ? [ev.awayScore, ev.homeScore] : [ev.homeScore, ev.awayScore];
-    return { score, state: ev.state, detail: ev.detail, clock: ev.clock, live: ev.state === "in", date: ev.date, scorers: ev.scorers || [] };
+    return { score, state: ev.state, detail: ev.detail, clock: ev.clock, live: ev.state === "in", date: ev.date, goals: ev.goals || [] };
   }
   if (m.sheetResult) return { score: m.sheetResult, state: "post", detail: "FT", live: false };
   return { score: null, state: "pre", detail: ev ? ev.detail : "", live: false, date: ev ? ev.date : null };
 }
 
-// "⚽ Quiñones, Mbappé (2)" — goal scorers from a flat list of names (preserves scoring order)
-function scorersHtml(names) {
-  if (!names || !names.length) return "";
-  const order = [], counts = {};
-  for (const n of names) { if (!(n in counts)) order.push(n); counts[n] = (counts[n] || 0) + 1; }
-  return `<div class="scorers"><span class="goal">⚽</span> ${order.map(n => esc(n) + (counts[n] > 1 ? ` (${counts[n]})` : "")).join(", ")}</div>`;
+// goals from an ESPN competition: { name, minute, team(displayName), pen, og } in scoring order
+function extractGoals(c) {
+  const byId = {};
+  for (const comp of (c.competitors || [])) byId[comp.team.id] = comp.team.displayName;
+  const goals = [];
+  for (const d of (c.details || [])) {
+    if (!d.scoringPlay || d.shootout) continue;
+    const a = (d.athletesInvolved || [])[0];
+    goals.push({
+      name: a ? a.displayName : "—",
+      minute: (d.clock && d.clock.displayValue) || "",
+      team: byId[d.team && d.team.id] || "",
+      pen: !!d.penaltyKick, og: !!d.ownGoal,
+    });
+  }
+  return goals;
 }
-function scorerNamesFromComp(c) {   // for knockout events (not stored in EV_BY_PAIR)
-  const out = [];
-  for (const d of (c.details || [])) if (d.scoringPlay && !d.ownGoal && !d.shootout)
-    for (const a of (d.athletesInvolved || []).slice(0, 1)) out.push(a.displayName);
-  return out;
+// match-style scorer block: each scoring team on its own line, "Player 9', Player 67' (pen)"
+function goalsHtml(goals) {
+  if (!goals || !goals.length) return "";
+  const order = [], byTeam = {};
+  for (const g of goals) { if (!(g.team in byTeam)) { byTeam[g.team] = []; order.push(g.team); } byTeam[g.team].push(g); }
+  const lines = order.map(team => {
+    const players = [], byPlayer = {};
+    for (const g of byTeam[team]) { if (!(g.name in byPlayer)) { byPlayer[g.name] = []; players.push(g.name); } byPlayer[g.name].push(g); }
+    const items = players.map(name => {
+      const mins = byPlayer[name].map(g => `${esc(g.minute)}${g.pen ? " (rp)" : ""}${g.og ? " (om)" : ""}`).join(", ");
+      return `${esc(name)}${mins ? " " + mins : ""}`;
+    }).join(", ");
+    return `<div class="gline">${flag(team) || "⚽ "}${items}</div>`;
+  });
+  return `<div class="scorers">${lines.join("")}</div>`;
 }
 
 /* ====== Specials evaluation ====== */
@@ -932,7 +948,7 @@ function renderSideboard(rows) {
 }
 
 function renderPicks(m, r) {
-  let h = scorersHtml(r.scorers);
+  let h = goalsHtml(r.goals);
   POOL_DATA.participants.forEach((p, i) => {
     const pick = m.picks[i];
     const pts = r.score ? matchPoints(pick, r.score) : null;
