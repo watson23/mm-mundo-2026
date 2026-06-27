@@ -91,6 +91,9 @@
   .pick.p0 { color: var(--muted); }
   .pick.live { outline: 1px dashed var(--live); }
   .hint { color: var(--muted); font-size: 11px; padding: 0 12px 10px; }
+  .scorers { font-size: 12px; color: var(--muted); padding: 2px 2px 6px; }
+  .picks .scorers { grid-column: 1 / -1; border-bottom: 1px solid var(--border); margin-bottom: 3px; }
+  .scorers .goal { opacity: .8; }
   .filterbar { display: flex; gap: 6px; margin: 0 0 12px; }
   .fpill { flex: 1; min-width: 0; padding: 7px 4px; border: 1px solid var(--border); border-radius: 999px; background: var(--panel); color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: color .15s, border-color .15s; }
   .fpill:hover { color: var(--text); }
@@ -614,7 +617,7 @@ function renderPlayoffSchedule(mode) {
         <div class="mteams">${koSideName(home.team.displayName)} – ${koSideName(away.team.displayName)}${st.state !== "post" ? koTvBadge(e) : ""}${clickable ? ` <span class="koexp">veikkaukset ›</span>` : ""}</div>
         <div class="mscore${score ? "" : " pre"}">${score || "–"}</div>
         <div class="mstatus">${status}</div>
-        </div>${clickable ? `<div class="kopicks">${renderKoBackers(home.team.displayName, away.team.displayName, homeT, awayT)}</div>` : ""}
+        </div>${clickable ? `<div class="kopicks">${st.state !== "pre" ? scorersHtml(scorerNamesFromComp(c)) : ""}${renderKoBackers(home.team.displayName, away.team.displayName, homeT, awayT)}</div>` : ""}
       </div>`;
     }
     h += `</div>`;
@@ -665,10 +668,24 @@ function resolveMatch(m) {
   if (ev && ev.state !== "pre") {
     const swapped = ev.homeName !== m.home;
     const score = swapped ? [ev.awayScore, ev.homeScore] : [ev.homeScore, ev.awayScore];
-    return { score, state: ev.state, detail: ev.detail, clock: ev.clock, live: ev.state === "in", date: ev.date };
+    return { score, state: ev.state, detail: ev.detail, clock: ev.clock, live: ev.state === "in", date: ev.date, scorers: ev.scorers || [] };
   }
   if (m.sheetResult) return { score: m.sheetResult, state: "post", detail: "FT", live: false };
   return { score: null, state: "pre", detail: ev ? ev.detail : "", live: false, date: ev ? ev.date : null };
+}
+
+// "⚽ Quiñones, Mbappé (2)" — goal scorers from a flat list of names (preserves scoring order)
+function scorersHtml(names) {
+  if (!names || !names.length) return "";
+  const order = [], counts = {};
+  for (const n of names) { if (!(n in counts)) order.push(n); counts[n] = (counts[n] || 0) + 1; }
+  return `<div class="scorers"><span class="goal">⚽</span> ${order.map(n => esc(n) + (counts[n] > 1 ? ` (${counts[n]})` : "")).join(", ")}</div>`;
+}
+function scorerNamesFromComp(c) {   // for knockout events (not stored in EV_BY_PAIR)
+  const out = [];
+  for (const d of (c.details || [])) if (d.scoringPlay && !d.ownGoal && !d.shootout)
+    for (const a of (d.athletesInvolved || []).slice(0, 1)) out.push(a.displayName);
+  return out;
 }
 
 /* ====== Specials evaluation ====== */
@@ -915,7 +932,7 @@ function renderSideboard(rows) {
 }
 
 function renderPicks(m, r) {
-  let h = "";
+  let h = scorersHtml(r.scorers);
   POOL_DATA.participants.forEach((p, i) => {
     const pick = m.picks[i];
     const pts = r.score ? matchPoints(pick, r.score) : null;
@@ -966,6 +983,15 @@ function renderSpecials(sp) {
   h += `</table></div>`;
   if (sp.maxGoals > 0) {
     h += `<div class="scorerlist">Maalikuningasjahti (${sp.maxGoals} ${sp.maxGoals === 1 ? "maali" : "maalia"}): ${sp.leaders.map(esc).join(", ")}${sp.topScorers ? " — <b>ratkennut</b>" : " — kesken"}</div>`;
+    // nearest chasers: 1–2 goals behind the leader
+    const chase = [];
+    for (const back of [1, 2]) {
+      const g = sp.maxGoals - back;
+      if (g < 1) continue;
+      const names = Object.keys(GOALS).filter(n => GOALS[n] === g).sort((a, b) => a.localeCompare(b));
+      if (names.length) chase.push(`${back} maalin päässä (${g}): ${names.map(esc).join(", ")}`);
+    }
+    if (chase.length) h += `<div class="scorerlist" style="opacity:.8">${chase.join(" · ")}</div>`;
   }
   if (sp.semiScorers.length) {
     h += `<div class="scorerlist">Välierien maalintekijät: ${sp.semiScorers.map(esc).join(", ")}</div>`;
