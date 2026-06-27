@@ -991,7 +991,7 @@ function renderSpecials(sp) {
       const names = Object.keys(GOALS).filter(n => GOALS[n] === g).sort((a, b) => a.localeCompare(b));
       if (names.length) chase.push(`${back} maalin päässä (${g}): ${names.map(esc).join(", ")}`);
     }
-    if (chase.length) h += `<div class="scorerlist" style="opacity:.8">${chase.join(" · ")}</div>`;
+    if (chase.length) h += `<div class="scorerlist" style="opacity:.8">${chase.join("<br>")}</div>`;
   }
   if (sp.semiScorers.length) {
     h += `<div class="scorerlist">Välierien maalintekijät: ${sp.semiScorers.map(esc).join(", ")}</div>`;
