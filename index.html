@@ -353,6 +353,7 @@ const FLAGS = {
   "Ecuador":"🇪🇨","Uruguay":"🇺🇾",
 };
 function flag(team) { return FLAGS[team] ? `<span class="flag">${FLAGS[team]}</span>` : ""; }
+function flagTitled(team) { return team && FLAGS[team] ? `<span class="flag" title="${esc(fi(team))}">${FLAGS[team]}</span>` : ""; }
 
 /* TV channels (source: suomifutis.com otteluohjelma) */
 const TV_CHANNELS = {
@@ -480,6 +481,7 @@ let EVENTS = [];          // raw ESPN events
 let EV_BY_PAIR = {};      // "TeamA|TeamB" sorted -> event info
 let KO_EVENTS = [];       // knockout events sorted by date
 let GOALS = {};           // athlete display name -> goal count (whole tournament)
+let PLAYER_TEAM = {};     // athlete display name -> country (team displayName)
 let lastFetchOk = null;
 let expanded = new Set();
 let activeTab = "board";
@@ -492,6 +494,7 @@ function parseEvents(events) {
   EVENTS = events;
   EV_BY_PAIR = {};
   GOALS = {};
+  PLAYER_TEAM = {};
   const groupIds = new Set();
   // earliest first, so a group game claims its pair before any later knockout rematch of it
   for (const e of [...events].sort((a, b) => a.date.localeCompare(b.date))) {
@@ -515,6 +518,7 @@ function parseEvents(events) {
       if (d.scoringPlay && !d.ownGoal && !d.shootout)
         for (const a of (d.athletesInvolved || []).slice(0, 1)) GOALS[a.displayName] = (GOALS[a.displayName] || 0) + 1;
     }
+    for (const g of info.goals) if (!g.og && g.team) PLAYER_TEAM[g.name] = g.team;   // scorer → country
     if (REAL_TEAMS.has(info.homeName) && REAL_TEAMS.has(info.awayName)) {
       const key = pairKey(info.homeName, info.awayName);
       // only a real group-stage pairing counts as a group match; knockout ties stay in KO_EVENTS
@@ -998,14 +1002,15 @@ function renderSpecials(sp) {
   }
   h += `</table></div>`;
   if (sp.maxGoals > 0) {
-    h += `<div class="scorerlist">Maalikuningasjahti (${sp.maxGoals} ${sp.maxGoals === 1 ? "maali" : "maalia"}): ${sp.leaders.map(esc).join(", ")}${sp.topScorers ? " — <b>ratkennut</b>" : " — kesken"}</div>`;
+    const nameFlag = n => `${flagTitled(PLAYER_TEAM[n])}${esc(n)}`;
+    h += `<div class="scorerlist">Maalikuningasjahti (${sp.maxGoals} ${sp.maxGoals === 1 ? "maali" : "maalia"}): ${sp.leaders.map(nameFlag).join(", ")}${sp.topScorers ? " — <b>ratkennut</b>" : " — kesken"}</div>`;
     // nearest chasers: 1–2 goals behind the leader
     const chase = [];
     for (const back of [1, 2]) {
       const g = sp.maxGoals - back;
       if (g < 1) continue;
       const names = Object.keys(GOALS).filter(n => GOALS[n] === g).sort((a, b) => a.localeCompare(b));
-      if (names.length) chase.push(`${back} maalin päässä (${g}): ${names.map(esc).join(", ")}`);
+      if (names.length) chase.push(`${back} maalin päässä (${g}): ${names.map(nameFlag).join(", ")}`);
     }
     if (chase.length) h += `<div class="scorerlist" style="opacity:.8">${chase.join("<br>")}</div>`;
   }
