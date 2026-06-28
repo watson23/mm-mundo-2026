@@ -231,6 +231,19 @@
   .glegend .dot2 { display: inline-block; width: 9px; height: 9px; border-radius: 2px; vertical-align: middle; margin: 0 3px 0 8px; }
   .glegend .dot2.a { background: var(--accent); }
   .glegend .dot2.g { background: var(--gold); }
+  /* knockout bracket */
+  .bracket { display: flex; gap: 8px; overflow-x: auto; padding: 4px 2px 12px; }
+  .bcol { display: flex; flex-direction: column; min-width: 82px; flex: 0 0 auto; }
+  .bch { text-align: center; font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .3px; margin-bottom: 6px; white-space: nowrap; }
+  .bcells { flex: 1; display: flex; flex-direction: column; justify-content: space-around; gap: 5px; }
+  .bmatch { background: var(--panel2); border: 1px solid var(--border); border-radius: 6px; padding: 3px 5px; }
+  .bteam { display: flex; align-items: center; gap: 2px; font-size: 11px; line-height: 1.55; white-space: nowrap; }
+  .bteam.win { color: var(--accent); font-weight: 700; }
+  .bteam.tbd { color: var(--muted); }
+  .bteam .babbr { overflow: hidden; text-overflow: ellipsis; }
+  .bteam .bsc { margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 700; padding-left: 4px; }
+  .bronze-line { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); margin: 2px 2px 14px; }
+  .bronze-line .bmatch { min-width: 82px; }
   .clinch { font-size: 11px; font-weight: 700; }
   .clinch.adv { color: var(--accent); }
   .day.clickable { cursor: pointer; display: flex; align-items: center; }
@@ -283,7 +296,7 @@
     <button id="tab-board" class="active" onclick="setTab('board')">Tilanne</button>
     <button id="tab-matches" onclick="setTab('matches')">Ottelut</button>
     <button id="tab-specials" onclick="setTab('specials')">Muut vedot</button>
-    <button id="tab-groups" onclick="setTab('groups')">Lohkot</button>
+    <button id="tab-groups" onclick="setTab('groups')">Turnaus</button>
   </nav>
 
   <div id="view-board"></div>
@@ -1325,9 +1338,53 @@ function computeGroupStandings() {
   return { standings, clinchedWinner };
 }
 
+/* ====== knockout bracket picture ====== */
+const R16N_BY_R32 = { "2,5": 1, "1,3": 2, "4,6": 3, "7,8": 4, "11,12": 5, "9,10": 6, "14,16": 7, "13,15": 8 };
+const QFN_BY_R16 = { "1,2": 1, "5,6": 2, "3,4": 3, "7,8": 4 };
+const SFN_BY_QF = { "1,2": 1, "3,4": 2 };
+function invPos(map) { const o = {}; for (const k in map) k.split(",").forEach(x => o[+x] = map[k]); return o; }
+const R16B_BY_N32 = invPos(R16N_BY_R32), QFB_BY_R16 = invPos(QFN_BY_R16);
+
+function renderBracket() {
+  if (!KO_EVENTS.length || !Object.keys(R32_BY_N).length) return "";
+  const ko = koInfo();
+  const teamR32N = {}, teamR16B = {}, teamQFB = {}, abbr = {};
+  for (let n = 1; n <= 16; n++) { const ev = R32_BY_N[n]; if (!ev) continue; for (const c of ev.competitions[0].competitors) if (REAL_TEAMS.has(c.team.displayName)) teamR32N[c.team.displayName] = n; }
+  for (const t in teamR32N) { teamR16B[t] = R16B_BY_N32[teamR32N[t]]; teamQFB[t] = QFB_BY_R16[teamR16B[t]]; }
+  for (const e of KO_EVENTS) for (const c of e.competitions[0].competitors) if (REAL_TEAMS.has(c.team.displayName)) abbr[c.team.displayName] = c.team.abbreviation;
+  const sideR32N = nm => { const m = nm.match(/^Round of 32 (\d+) Winner$/); return m ? +m[1] : (teamR32N[nm] ?? null); };
+  const sideR16B = nm => { const m = nm.match(/^Round of 16 (\d+) Winner$/); return m ? +m[1] : (teamR16B[nm] ?? null); };
+  const sideQFB = nm => { const m = nm.match(/^Quarterfinal (\d+) Winner$/); return m ? +m[1] : (teamQFB[nm] ?? null); };
+  const place = (events, sideFn, posMap) => { const arr = []; for (const e of events) { const c = e.competitions[0].competitors; const key = [sideFn(c[0].team.displayName), sideFn(c[1].team.displayName)].sort((a, b) => a - b).join(","); if (posMap[key]) arr[posMap[key] - 1] = e; } return arr; };
+  const r32 = []; for (let n = 1; n <= 16; n++) r32[n - 1] = R32_BY_N[n];
+  const r16 = place(ko.r16, sideR32N, R16N_BY_R32), qf = place(ko.qf, sideR16B, QFN_BY_R16), sf = place(ko.sf, sideQFB, SFN_BY_QF);
+
+  function sideHtml(ev, idx) {
+    if (!ev) return `<span class="bteam tbd">·</span>`;
+    const c = ev.competitions[0].competitors[idx], nm = c.team.displayName, st = ev.status.type;
+    if (REAL_TEAMS.has(nm)) return `<span class="bteam ${c.winner ? "win" : ""}">${flag(nm)}<span class="babbr">${esc(abbr[nm] || fi(nm))}</span><span class="bsc">${st.state !== "pre" ? esc(c.score) : ""}</span></span>`;
+    const m = nm.match(/^Round of 32 (\d+) Winner$/);
+    if (m && R32_BY_N[+m[1]]) { const ts = R32_BY_N[+m[1]].competitions[0].competitors.map(x => x.team.displayName).filter(t => REAL_TEAMS.has(t)); if (ts.length === 2) return `<span class="bteam tbd">${flag(ts[0])}${flag(ts[1])}</span>`; }
+    return `<span class="bteam tbd">·</span>`;
+  }
+  const matchBox = ev => `<div class="bmatch">${sideHtml(ev, 0)}${sideHtml(ev, 1)}</div>`;
+  const col = (label, order, evs) => `<div class="bcol"><div class="bch">${label}</div><div class="bcells">${order.map(p => matchBox(evs[p - 1])).join("")}</div></div>`;
+
+  let h = `<h3 class="sec">🏆 Kaavio <span class="note">(mahdolliset joukkueet / voittaja korostettuna)</span></h3><div class="bracket">`;
+  h += col("32 parasta", [2, 5, 1, 3, 11, 12, 9, 10, 4, 6, 7, 8, 14, 16, 13, 15], r32);
+  h += col("16 parasta", [1, 2, 5, 6, 3, 4, 7, 8], r16);
+  h += col("8 parasta", [1, 2, 3, 4], qf);
+  h += col("4 parasta", [1, 2], sf);
+  h += `<div class="bcol"><div class="bch">Loppu</div><div class="bcells">${matchBox(ko.final[0])}</div></div>`;
+  h += `</div>`;
+  if (ko.bronze[0]) h += `<div class="bronze-line">🥉 Pronssiottelu: ${matchBox(ko.bronze[0])}</div>`;
+  return h;
+}
+
 function renderGroups() {
   const { standings } = GROUPS || computeGroupStandings();
-  let h = `<div class="glegend"><span class="dot2 a"></span>2 parasta jatkoon · <span class="dot2 g"></span>3. sija (8 parasta kolmosta jatkoon) · <span class="clinch win">🏆</span> lohkovoitto varma · <span class="clinch adv">✓</span> jatkopaikka varma</div>`;
+  let h = renderBracket();
+  h += `<h3 class="sec">Lohkot</h3><div class="glegend"><span class="dot2 a"></span>2 parasta jatkoon · <span class="dot2 g"></span>3. sija (8 parasta kolmosta jatkoon) · <span class="clinch win">🏆</span> lohkovoitto varma · <span class="clinch adv">✓</span> jatkopaikka varma</div>`;
   for (const { group, rows, live } of standings) {
     const open = expandedGroups.has(group);
     h += `<div class="panel"><div class="day clickable" onclick="toggleGroup('${group}')">Lohko ${group}${live ? ` <span class="badge-live"><span class="livedot">●</span> LIVE</span>` : ""}<span class="gchev" data-gm="${group}">${open ?"▾ ottelut" : "▸ ottelut"}</span></div>`;
