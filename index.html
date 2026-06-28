@@ -1098,16 +1098,22 @@ function eliminatedTeams() {
   return out;
 }
 function outMark(team) { return ELIM.has(team) ? ` <span class="outtag" title="Pudonnut jatkosta">✕</span>` : ""; }
-// resolve a free-text scorer pick to a country: the pick's surname must exactly match a token of a
-// player seen in events, and only when unambiguous (avoids e.g. "Michael" matching "Michal")
+// resolve a free-text scorer pick to a country via players seen in events. Exact surname match
+// first; fall back to a fuzzy match (tolerating typos like "Mbabbe"→"Mbappé") only if there's no
+// exact hit. Resolves only when the match points to a single country (avoids false positives).
 function pickCountry(name) {
   if (!name) return null;
   const tokens = deaccent(name.toLowerCase()).split(/[\s.]+/).filter(t => t.length >= 4);
   if (!tokens.length) return null;
   const surname = tokens[tokens.length - 1];
-  const hits = new Set();
-  for (const player in PLAYER_TEAM)
-    if (deaccent(player.toLowerCase()).split(/[\s.]+/).includes(surname)) hits.add(PLAYER_TEAM[player]);
+  const players = Object.keys(PLAYER_TEAM).map(p => ({ team: PLAYER_TEAM[p], toks: deaccent(p.toLowerCase()).split(/[\s.]+/) }));
+  const collect = test => { const s = new Set(); for (const p of players) if (p.toks.some(test)) s.add(p.team); return s; };
+  let hits = collect(t => t === surname);                       // exact
+  if (!hits.size) {                                             // fuzzy fallback for typos
+    const tol = surname.length >= 5 ? 2 : 1;
+    hits = collect(t => t.length === surname.length && lev(t, surname) <= tol);   // same length first
+    if (!hits.size) hits = collect(t => t.length >= 4 && lev(t, surname) <= tol);
+  }
   return hits.size === 1 ? [...hits][0] : null;
 }
 
