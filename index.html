@@ -111,6 +111,8 @@
   .chip.hit { background: #14402a; color: var(--accent); font-weight: 600; }
   .chip.hit.bonus { background: #4d3f10; color: var(--gold); }
   .chip.miss { color: var(--muted); text-decoration: line-through; opacity: 0.7; }
+  .chip.dead { color: var(--muted); text-decoration: line-through; opacity: 0.6; }
+  .outtag { color: var(--live); font-size: 10px; font-weight: 700; text-decoration: none; margin-left: 2px; }
   .note { color: var(--muted); font-size: 12px; margin: 6px 4px 14px; }
   .scorerlist { font-size: 13px; color: var(--muted); margin: 4px; }
   .ko .mrow { cursor: default; }
@@ -518,7 +520,12 @@ function parseEvents(events) {
       if (d.scoringPlay && !d.ownGoal && !d.shootout)
         for (const a of (d.athletesInvolved || []).slice(0, 1)) GOALS[a.displayName] = (GOALS[a.displayName] || 0) + 1;
     }
-    for (const g of info.goals) if (!g.og && g.team) PLAYER_TEAM[g.name] = g.team;   // scorer → country
+    const teamById = {};   // map every athlete that appears (goals, cards, …) to their own country
+    for (const comp of comps) teamById[comp.team.id] = comp.team.displayName;
+    for (const d of (c.details || [])) for (const a of (d.athletesInvolved || [])) {
+      const tn = a.team && teamById[a.team.id];
+      if (a.displayName && tn && !(a.displayName in PLAYER_TEAM)) PLAYER_TEAM[a.displayName] = tn;
+    }
     if (REAL_TEAMS.has(info.homeName) && REAL_TEAMS.has(info.awayName)) {
       const key = pairKey(info.homeName, info.awayName);
       // only a real group-stage pairing counts as a group match; knockout ties stay in KO_EVENTS
@@ -976,7 +983,7 @@ function renderSpecials(sp) {
   h += `<div class="panel panel-scroll"><table class="spec-table"><tr><th>Nimi</th><th>Veikkaus</th><th style="text-align:right">P</th></tr>`;
   for (const p of POOL_DATA.participants) {
     const d = sp.per[p].detail.top8;
-    h += `<tr><td><b>${esc(p)}</b></td><td>${d.map(x => `<span class="chip ${x.hit ? "hit" + (x.got > 10 ? " bonus" : "") : (sp.qfTeams.size >= 8 ? "miss" : "")}">${flag(x.team)}${esc(fi(x.team))}</span>`).join("")}</td><td class="pts">${d.reduce((a, x) => a + x.got, 0) || ""}</td></tr>`;
+    h += `<tr><td><b>${esc(p)}</b></td><td>${d.map(x => `<span class="chip ${x.hit ? "hit" + (x.got > 10 ? " bonus" : "") : (ELIM.has(x.team) ? "dead" : (sp.qfTeams.size >= 8 ? "miss" : ""))}">${flag(x.team)}${esc(fi(x.team))}${x.hit ? "" : outMark(x.team)}</span>`).join("")}</td><td class="pts">${d.reduce((a, x) => a + x.got, 0) || ""}</td></tr>`;
   }
   h += `</table></div>`;
   h += sp.qfTeams.size ? `<div class="note">Puolivälierissä varmistuneet: ${[...sp.qfTeams].map(t => flag(t) + esc(fi(t))).join(", ")}</div>` : `<div class="note">Ratkeaa kun puolivälieräparit selviävät.</div>`;
@@ -985,7 +992,7 @@ function renderSpecials(sp) {
   h += `<div class="panel panel-scroll"><table class="spec-table"><tr><th>Nimi</th><th>Veikkaus</th><th style="text-align:right">P</th></tr>`;
   for (const p of POOL_DATA.participants) {
     const d = sp.per[p].detail.top4;
-    h += `<tr><td><b>${esc(p)}</b></td><td>${d.map(x => `<span class="chip ${x.hit ? "hit" + (x.got > 10 ? " bonus" : "") : (sp.sfTeams.size >= 4 ? "miss" : "")}">${flag(x.team)}${esc(fi(x.team))}</span>`).join("")}</td><td class="pts">${d.reduce((a, x) => a + x.got, 0) || ""}</td></tr>`;
+    h += `<tr><td><b>${esc(p)}</b></td><td>${d.map(x => `<span class="chip ${x.hit ? "hit" + (x.got > 10 ? " bonus" : "") : (ELIM.has(x.team) ? "dead" : (sp.sfTeams.size >= 4 ? "miss" : ""))}">${flag(x.team)}${esc(fi(x.team))}${x.hit ? "" : outMark(x.team)}</span>`).join("")}</td><td class="pts">${d.reduce((a, x) => a + x.got, 0) || ""}</td></tr>`;
   }
   h += `</table></div>`;
 
@@ -995,9 +1002,11 @@ function renderSpecials(sp) {
   for (const p of POOL_DATA.participants) {
     const d = sp.per[p].detail;
     const ss = d.semiScorer, ts = d.topScorer;
+    const ssC = pickCountry(ss.pick), ssDead = !ss.hit && ssC && ELIM.has(ssC);
+    const tsC = pickCountry(ts.pick), tsOut = !ts.hit && tsC && ELIM.has(tsC);
     h += `<tr><td><b>${esc(p)}</b></td>
-      <td><span class="chip ${ss.hit ? "hit" : ""}">${esc(ss.pick || "—")}</span></td>
-      <td><span class="chip ${ts.hit ? "hit" : ""}">${esc(ts.pick || "—")}</span>${ts.leading ? ` <span class="note">johdossa 👀</span>` : ""}</td>
+      <td><span class="chip ${ss.hit ? "hit" : (ssDead ? "dead" : "")}">${ssC ? flagTitled(ssC) : ""}${esc(ss.pick || "—")}${ssDead ? ` <span class="outtag" title="Joukkue pudonnut">✕</span>` : ""}</span></td>
+      <td><span class="chip ${ts.hit ? "hit" : ""}">${tsC ? flagTitled(tsC) : ""}${esc(ts.pick || "—")}${tsOut ? ` <span class="outtag" title="Joukkue pudonnut – maalisaldo jäissä">✕</span>` : ""}</span>${ts.leading ? ` <span class="note">johdossa 👀</span>` : ""}</td>
       <td class="pts">${(ss.got + ts.got) || ""}</td></tr>`;
   }
   h += `</table></div>`;
@@ -1023,7 +1032,7 @@ function renderSpecials(sp) {
     <tr><th>Nimi</th><th>Pronssi</th><th>Hopea</th><th>Mestari</th><th style="text-align:right">P</th></tr>`;
   for (const p of POOL_DATA.participants) {
     const d = sp.per[p].detail;
-    const cell = (x, actual) => `<span class="chip ${x.hit ? "hit bonus" : (actual ? "miss" : "")}">${x.pick ? flag(x.pick) : ""}${esc(x.pick ? fi(x.pick) : "—")} (${x.potential || ""})</span>`;
+    const cell = (x, actual) => `<span class="chip ${x.hit ? "hit bonus" : (x.pick && ELIM.has(x.pick) ? "dead" : (actual ? "miss" : ""))}">${x.pick ? flag(x.pick) : ""}${esc(x.pick ? fi(x.pick) : "—")} (${x.potential || ""})${x.hit ? "" : outMark(x.pick)}</span>`;
     h += `<tr><td><b>${esc(p)}</b></td>
       <td>${cell(d.bronze, sp.bronzeWinner)}</td>
       <td>${cell(d.finalLoser, sp.finalLoser)}</td>
@@ -1067,10 +1076,46 @@ function renderSpecials(sp) {
 
 let LAST = null;        // { rows, sp } from the most recent compute, for the player modal
 let GROUPS = null;      // { standings, clinchedWinner } shared by Lohkot + playoff schedule
+let ELIM = new Set();   // teams eliminated from the tournament
+
+// teams out of the tournament: 4th in finalized groups, the 4 worst thirds (once all groups done),
+// and losers of completed knockout matches
+function eliminatedTeams() {
+  const out = new Set();
+  if (!GROUPS) return out;
+  const finalized = GROUPS.standings.filter(s => s.finalized);
+  for (const s of finalized) if (s.rows[3]) out.add(s.rows[3].team);   // 4th place
+  if (finalized.length === 12) {
+    const thirds = finalized.map(s => ({ team: s.rows[2].team, Pts: s.rows[2].Pts, GD: s.rows[2].GF - s.rows[2].GA, GF: s.rows[2].GF }));
+    thirds.sort((a, b) => b.Pts - a.Pts || b.GD - a.GD || b.GF - a.GF || a.team.localeCompare(b.team));
+    thirds.slice(8).forEach(t => out.add(t.team));   // ranks 9–12 of the thirds miss out
+  }
+  for (const e of KO_EVENTS) {
+    if (e.status.type.state !== "post") continue;
+    for (const comp of (e.competitions[0].competitors || []))
+      if (!comp.winner && REAL_TEAMS.has(comp.team.displayName)) out.add(comp.team.displayName);
+  }
+  return out;
+}
+function outMark(team) { return ELIM.has(team) ? ` <span class="outtag" title="Pudonnut jatkosta">✕</span>` : ""; }
+// resolve a free-text scorer pick to a country: the pick's surname must exactly match a token of a
+// player seen in events, and only when unambiguous (avoids e.g. "Michael" matching "Michal")
+function pickCountry(name) {
+  if (!name) return null;
+  const tokens = deaccent(name.toLowerCase()).split(/[\s.]+/).filter(t => t.length >= 4);
+  if (!tokens.length) return null;
+  const surname = tokens[tokens.length - 1];
+  const hits = new Set();
+  for (const player in PLAYER_TEAM)
+    if (deaccent(player.toLowerCase()).split(/[\s.]+/).includes(surname)) hits.add(PLAYER_TEAM[player]);
+  return hits.size === 1 ? [...hits][0] : null;
+}
+
 function renderAll() {
   const { rows, sp } = computeTotals();
   LAST = { rows, sp };
   GROUPS = computeGroupStandings();
+  ELIM = eliminatedTeams();
   renderBoard({ rows });
   renderMatches(rows);
   renderSpecials(sp);
@@ -1328,9 +1373,9 @@ function renderPlayerModal() {
 
   // specials
   const det = sp.per[name].detail;
-  const teamChip = (x, decided) => `<span class="chip ${x.hit ? "hit" + (x.got > 10 ? " bonus" : "") : (decided ? "miss" : "")}">${flag(x.team)}${esc(fi(x.team))}${x.hit ? " +" + x.got : ""}</span>`;
-  const medalChip = (x, actual) => `<span class="chip ${x.hit ? "hit bonus" : (actual ? "miss" : "")}">${x.pick ? flag(x.pick) : ""}${esc(x.pick ? fi(x.pick) : "—")} (${x.potential || ""})${x.hit ? " +" + x.got : ""}</span>`;
-  const scorerChip = (x, extra = "") => `<span class="chip ${x.hit ? "hit" : ""}">${esc(x.pick || "—")}${x.hit ? " +" + x.got : ""}</span>${extra}`;
+  const teamChip = (x, decided) => `<span class="chip ${x.hit ? "hit" + (x.got > 10 ? " bonus" : "") : (ELIM.has(x.team) ? "dead" : (decided ? "miss" : ""))}">${flag(x.team)}${esc(fi(x.team))}${x.hit ? " +" + x.got : outMark(x.team)}</span>`;
+  const medalChip = (x, actual) => `<span class="chip ${x.hit ? "hit bonus" : (x.pick && ELIM.has(x.pick) ? "dead" : (actual ? "miss" : ""))}">${x.pick ? flag(x.pick) : ""}${esc(x.pick ? fi(x.pick) : "—")} (${x.potential || ""})${x.hit ? " +" + x.got : outMark(x.pick)}</span>`;
+  const scorerChip = (x, extra = "") => { const c = pickCountry(x.pick), out = !x.hit && c && ELIM.has(c); return `<span class="chip ${x.hit ? "hit" : (out ? "dead" : "")}">${c ? flagTitled(c) : ""}${esc(x.pick || "—")}${x.hit ? " +" + x.got : (out ? ` <span class="outtag" title="Joukkue pudonnut">✕</span>` : "")}</span>${extra}`; };
   const specRow = (label, val) => `<div class="pspec"><div class="pspec-l">${label}</div><div class="pspec-v">${val}</div></div>`;
 
   let sps = `<h3 class="psec">Erikoisveikkaukset (${sp.per[name].pts} p)</h3>`;
