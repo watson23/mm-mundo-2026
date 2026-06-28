@@ -120,6 +120,8 @@
   .ko .day { text-transform: none; }
   .ko .mtime { width: 56px; white-space: normal; line-height: 1.25; flex-shrink: 0; }
   .ko-tbd { color: var(--muted); font-weight: 500; font-style: italic; }
+  .ko-poss { font-weight: 600; }
+  .ko-poss .koslash { color: var(--muted); font-weight: 400; margin: 0 1px; }
   .koexp { font-size: 10px; color: var(--muted); white-space: nowrap; }
   .kopicks { display: none; padding: 2px 12px 12px; }
   .match.ko.open .kopicks { display: block; }
@@ -551,6 +553,32 @@ function koRoundName(idx, total, e) {
 }
 const ROUND_FI = { r32: "32 parasta", r16: "16 parasta", qf: "Puolivälierät", sf: "Välierät", bronze: "Pronssiottelu", final: "Loppuottelu" };
 
+// FIFA R32 bracket (match 73–88 = "Round of 32 1–16"): each group winner/runner-up slot → match N.
+// Lets us show the two possible teams behind a "Round of 32 N Winner" placeholder in the R16.
+const SLOT_TO_N = {
+  "2A": 1, "2B": 1, "1E": 2, "1F": 3, "2C": 3, "1C": 4, "2F": 4, "1I": 5, "2E": 6, "2I": 6,
+  "1A": 7, "1L": 8, "1D": 9, "1G": 10, "2K": 11, "2L": 11, "1H": 12, "2J": 12, "1B": 13,
+  "1J": 14, "2H": 14, "1K": 15, "2D": 16, "2G": 16,
+};
+function teamSlot(team) {   // "1A"/"2B" from final group position, or null for 3rd/4th
+  if (!GROUPS) return null;
+  for (const s of GROUPS.standings) {
+    const i = s.rows.findIndex(r => r.team === team);
+    if (i >= 0) return i < 2 ? `${i + 1}${s.group}` : null;
+  }
+  return null;
+}
+let R32_BY_N = {};   // R32 match number → the actual ESPN event (with its two teams)
+function buildR32ByN() {
+  const map = {};
+  for (const ev of (koInfo().r32 || []))
+    for (const c of ev.competitions[0].competitors) {
+      const n = SLOT_TO_N[teamSlot(c.team.displayName)];
+      if (n) { map[n] = ev; break; }
+    }
+  return map;
+}
+
 // resolve a knockout slot to a real team: ESPN-assigned, or a group winner we've already
 // proven clinched. Returns the canonical team name, or null if still undetermined.
 function koResolveTeam(displayName) {
@@ -586,7 +614,12 @@ function koSideName(displayName) {
   if (m = n.match(/^Group ([A-L]) Winner$/)) return `<span class="ko-tbd">Lohkon ${m[1]} voittaja</span>`;
   if (m = n.match(/^Group ([A-L]) 2nd Place$/)) return `<span class="ko-tbd">Lohkon ${m[1]} kakkonen</span>`;
   if (m = n.match(/^Third Place Group ([A-Z/]+)$/)) return `<span class="ko-tbd">3. sija (${m[1]})</span>`;
-  if (m = n.match(/^Round of 32 (\d+) Winner$/)) return `<span class="ko-tbd">32 par. ottelu ${m[1]}</span>`;
+  if (m = n.match(/^Round of 32 (\d+) Winner$/)) {
+    const ev = R32_BY_N[+m[1]];
+    const teams = ev ? ev.competitions[0].competitors.map(c => c.team.displayName).filter(t => REAL_TEAMS.has(t)) : [];
+    if (teams.length === 2) return `<span class="ko-poss">${flag(teams[0])}${esc(fi(teams[0]))} <span class="koslash">/</span> ${flag(teams[1])}${esc(fi(teams[1]))}</span>`;
+    return `<span class="ko-tbd">32 par. ottelu ${m[1]}</span>`;
+  }
   if (m = n.match(/^Round of 16 (\d+) Winner$/)) return `<span class="ko-tbd">16 par. ottelu ${m[1]}</span>`;
   if (m = n.match(/^Quarterfinal (\d+) Winner$/)) return `<span class="ko-tbd">Puolivälierä ${m[1]}</span>`;
   if (m = n.match(/^Semifinal (\d+) Winner$/)) return `<span class="ko-tbd">Välierä ${m[1]} voittaja</span>`;
@@ -1125,6 +1158,7 @@ function renderAll() {
   LAST = { rows, sp };
   GROUPS = computeGroupStandings();
   ELIM = eliminatedTeams();
+  R32_BY_N = buildR32ByN();
   renderBoard({ rows });
   renderMatches(rows);
   renderSpecials(sp);
