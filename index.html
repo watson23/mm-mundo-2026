@@ -502,6 +502,24 @@ function playerMatch(pick, scorerName) {
 
 /* ====== Live data ====== */
 const API = "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=20260610-20260720&limit=250";
+const SUMMARY_API = "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/summary?event=";
+const SHOOTOUTS = {};   // eventId -> full shootout (per team, each kick with didScore) from the summary endpoint
+// fetch full shootout sequences (incl. misses) for finished penalty matches not yet cached
+async function fetchShootouts() {
+  const pending = KO_EVENTS.filter(e => e.status.type.state === "post"
+    && (e.competitions[0].competitors || []).some(c => c.shootoutScore != null) && !SHOOTOUTS[e.id]);
+  if (!pending.length) return false;
+  let got = false;
+  await Promise.all(pending.map(async e => {
+    try {
+      const r = await fetch(SUMMARY_API + e.id);
+      if (!r.ok) return;
+      const d = await r.json();
+      if (Array.isArray(d.shootout) && d.shootout.length) { SHOOTOUTS[e.id] = d.shootout; got = true; }
+    } catch (err) {}
+  }));
+  return got;
+}
 let EVENTS = [];          // raw ESPN events
 let EV_BY_PAIR = {};      // "TeamA|TeamB" sorted -> event info
 let KO_EVENTS = [];       // knockout events sorted by date
@@ -668,7 +686,7 @@ function renderPlayoffSchedule(mode) {
       const home = c.competitors.find(x => x.homeAway === "home"), away = c.competitors.find(x => x.homeAway === "away");
       const st = e.status.type, live = st.state === "in", when = new Date(e.date);
       const score = st.state === "pre" ? "" : `${home.score}–${away.score}`;
-      const so = st.state === "post" ? extractShootout(c) : null;
+      const so = st.state === "post" ? extractShootout(c, e.id) : null;
       const status = live ? `<span class="badge-live"><span class="livedot">●</span> ${esc(st.name === "STATUS_HALFTIME" ? "HT" : (e.status.displayClock || "LIVE"))}</span>` : (st.state === "post" ? esc(st.shortDetail || "FT") : "");
       const homeT = koResolveTeam(home.team.displayName), awayT = koResolveTeam(away.team.displayName);
       const clickable = homeT || awayT;   // can show backers once at least one side is known
@@ -708,24 +726,32 @@ function renderKoBackers(homeName, awayName, homeT, awayT) {
     <div class="kosides">${side(homeName, homeT)}${side(awayName, awayT)}</div>`;
 }
 
-// penalty shootout: result + the kicks (scored/missed) from a finished knockout match
-function extractShootout(c) {
+// penalty shootout: result + per-team kicks. Uses the detailed summary (incl. misses) once cached,
+// otherwise the scoreboard details (scored kicks only).
+function extractShootout(c, eventId) {
   const comps = c.competitors || [];
   const home = comps.find(x => x.homeAway === "home"), away = comps.find(x => x.homeAway === "away");
   if (!home || !away || (home.shootoutScore == null && away.shootoutScore == null)) return null;
-  const byId = {}; comps.forEach(x => byId[x.team.id] = x.team.displayName);
-  const kicks = [];
-  for (const d of (c.details || [])) if (d.shootout) { const a = (d.athletesInvolved || [])[0]; kicks.push({ team: byId[d.team && d.team.id], name: a ? a.displayName : "", scored: !!d.scoringPlay }); }
-  return { homeName: home.team.displayName, awayName: away.team.displayName, hs: +home.shootoutScore, as: +away.shootoutScore, winner: (comps.find(x => x.winner) || {}).team?.displayName || null, kicks };
+  const result = { hs: +home.shootoutScore, as: +away.shootoutScore, winner: (comps.find(x => x.winner) || {}).team?.displayName || null, teams: [] };
+  const detail = SHOOTOUTS[eventId];
+  if (detail) {
+    result.teams = detail.map(g => ({ team: g.team, shots: (g.shots || []).slice().sort((a, b) => a.shotNumber - b.shotNumber).map(s => ({ name: s.player, scored: s.didScore })) }));
+  } else {
+    const byId = {}, groups = {}, order = [];
+    comps.forEach(x => byId[x.team.id] = x.team.displayName);
+    for (const d of (c.details || [])) if (d.shootout) {
+      const team = byId[d.team && d.team.id], a = (d.athletesInvolved || [])[0];
+      if (!(team in groups)) { groups[team] = []; order.push(team); }
+      groups[team].push({ name: a ? a.displayName : "", scored: !!d.scoringPlay });
+    }
+    result.teams = order.map(t => ({ team: t, shots: groups[t] }));
+  }
+  return result;
 }
 function shootoutHtml(so) {
   if (!so) return "";
-  const lines = [so.homeName, so.awayName].map(team => {
-    const ks = so.kicks.filter(k => k.team === team);
-    if (!ks.length) return "";
-    const items = ks.map(k => `${esc(k.name)} ${k.scored ? "✓" : '<span class="pmiss">✗</span>'}`).join(", ");
-    return `<div class="gline">${flag(team)}${items}</div>`;
-  }).filter(Boolean).join("");
+  const lines = so.teams.map(g => g.shots.length
+    ? `<div class="gline">${flag(g.team)}${g.shots.map(s => `${esc(s.name)} ${s.scored ? "✓" : '<span class="pmiss">✗</span>'}`).join(", ")}</div>` : "").filter(Boolean).join("");
   return `<div class="scorers"><div class="solabel">Rangaistuspotkukilpailu ${so.hs}–${so.as}${so.winner ? ` · ${flag(so.winner)}${esc(fi(so.winner))} jatkoon` : ""}</div>${lines}</div>`;
 }
 
@@ -1563,6 +1589,7 @@ async function refresh() {
     $("updated").innerHTML = `<span class="dot"></span>Tulospäivitys epäonnistui${lastFetchOk ? " — näytetään klo " + TIME_FMT.format(lastFetchOk) + " tilanne" : ""}`;
   }
   renderAll();
+  fetchShootouts().then(got => { if (got) renderAll(); });   // fill in penalty misses, then re-render
   scheduleNext();
 }
 function anyLive() { return EVENTS.some(e => e.status.type.state === "in"); }
