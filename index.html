@@ -94,6 +94,10 @@
   .scorers { font-size: 12px; color: var(--muted); padding: 2px 2px 6px; }
   .picks .scorers { grid-column: 1 / -1; border-bottom: 1px solid var(--border); margin-bottom: 3px; }
   .scorers .gline { padding: 1px 0; }
+  .pen { font-size: 10px; color: var(--muted); white-space: nowrap; }
+  .solabel { color: var(--gold); font-weight: 600; margin: 3px 0; }
+  .pmiss { color: var(--live); }
+  .bpen { font-size: 9px; color: var(--muted); margin-left: 1px; }
   .filterbar { display: flex; gap: 6px; margin: 0 0 12px; }
   .fpill { flex: 1; min-width: 0; padding: 7px 4px; border: 1px solid var(--border); border-radius: 999px; background: var(--panel); color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: color .15s, border-color .15s; }
   .fpill:hover { color: var(--text); }
@@ -660,17 +664,19 @@ function renderPlayoffSchedule(mode) {
       const home = c.competitors.find(x => x.homeAway === "home"), away = c.competitors.find(x => x.homeAway === "away");
       const st = e.status.type, live = st.state === "in", when = new Date(e.date);
       const score = st.state === "pre" ? "" : `${home.score}–${away.score}`;
+      const so = st.state === "post" ? extractShootout(c) : null;
       const status = live ? `<span class="badge-live"><span class="livedot">●</span> ${esc(st.name === "STATUS_HALFTIME" ? "HT" : (e.status.displayClock || "LIVE"))}</span>` : (st.state === "post" ? esc(st.shortDetail || "FT") : "");
       const homeT = koResolveTeam(home.team.displayName), awayT = koResolveTeam(away.team.displayName);
       const clickable = homeT || awayT;   // can show backers once at least one side is known
       const open = expandedKo.has(e.id) ? " open" : "";
+      const koName = comp => (so && so.winner === comp.team.displayName) ? `<b>${koSideName(comp.team.displayName)}</b>` : koSideName(comp.team.displayName);
       h += `<div class="match ko${live ? " islive" : ""}${clickable ? " clickable" : ""}${open}"${clickable ? ` data-ko="${esc(e.id)}"` : ""}>
         <div class="mrow"${clickable ? ` onclick="toggleKo('${esc(e.id)}')"` : ""}>
         <div class="mtime">${DAY_FMT.format(when)}<br>${TIME_FMT.format(when)}</div>
-        <div class="mteams">${koSideName(home.team.displayName)} – ${koSideName(away.team.displayName)}${st.state !== "post" ? koTvBadge(e) : ""}${clickable ? ` <span class="koexp">veikkaukset ›</span>` : ""}</div>
+        <div class="mteams">${koName(home)} – ${koName(away)}${so ? ` <span class="pen">rp ${so.hs}–${so.as}</span>` : ""}${st.state !== "post" ? koTvBadge(e) : ""}${clickable ? ` <span class="koexp">veikkaukset ›</span>` : ""}</div>
         <div class="mscore${score ? "" : " pre"}">${score || "–"}</div>
         <div class="mstatus">${status}</div>
-        </div>${clickable ? `<div class="kopicks">${st.state !== "pre" ? goalsHtml(extractGoals(c)) : ""}${renderKoBackers(home.team.displayName, away.team.displayName, homeT, awayT)}</div>` : ""}
+        </div>${clickable ? `<div class="kopicks">${st.state !== "pre" ? goalsHtml(extractGoals(c)) + shootoutHtml(so) : ""}${renderKoBackers(home.team.displayName, away.team.displayName, homeT, awayT)}</div>` : ""}
       </div>`;
     }
     h += `</div>`;
@@ -696,6 +702,27 @@ function renderKoBackers(homeName, awayName, homeT, awayT) {
   };
   return `<div class="kohint">Ketkä ovat veikanneet näitä joukkueita jatkoon (8/4 parasta, mitalit):</div>
     <div class="kosides">${side(homeName, homeT)}${side(awayName, awayT)}</div>`;
+}
+
+// penalty shootout: result + the kicks (scored/missed) from a finished knockout match
+function extractShootout(c) {
+  const comps = c.competitors || [];
+  const home = comps.find(x => x.homeAway === "home"), away = comps.find(x => x.homeAway === "away");
+  if (!home || !away || (home.shootoutScore == null && away.shootoutScore == null)) return null;
+  const byId = {}; comps.forEach(x => byId[x.team.id] = x.team.displayName);
+  const kicks = [];
+  for (const d of (c.details || [])) if (d.shootout) { const a = (d.athletesInvolved || [])[0]; kicks.push({ team: byId[d.team && d.team.id], name: a ? a.displayName : "", scored: !!d.scoringPlay }); }
+  return { homeName: home.team.displayName, awayName: away.team.displayName, hs: +home.shootoutScore, as: +away.shootoutScore, winner: (comps.find(x => x.winner) || {}).team?.displayName || null, kicks };
+}
+function shootoutHtml(so) {
+  if (!so) return "";
+  const lines = [so.homeName, so.awayName].map(team => {
+    const ks = so.kicks.filter(k => k.team === team);
+    if (!ks.length) return "";
+    const items = ks.map(k => `${esc(k.name)} ${k.scored ? "✓" : '<span class="pmiss">✗</span>'}`).join(", ");
+    return `<div class="gline">${flag(team)}${items}</div>`;
+  }).filter(Boolean).join("");
+  return `<div class="scorers"><div class="solabel">Rangaistuspotkukilpailu ${so.hs}–${so.as}${so.winner ? ` · ${flag(so.winner)}${esc(fi(so.winner))} jatkoon` : ""}</div>${lines}</div>`;
 }
 
 function koInfo() {
@@ -1362,7 +1389,7 @@ function renderBracket() {
   function sideHtml(ev, idx) {
     if (!ev) return `<span class="bteam tbd">·</span>`;
     const c = ev.competitions[0].competitors[idx], nm = c.team.displayName, st = ev.status.type;
-    if (REAL_TEAMS.has(nm)) return `<span class="bteam ${c.winner ? "win" : ""}">${flag(nm)}<span class="babbr">${esc(abbr[nm] || fi(nm))}</span><span class="bsc">${st.state !== "pre" ? esc(c.score) : ""}</span></span>`;
+    if (REAL_TEAMS.has(nm)) return `<span class="bteam ${c.winner ? "win" : ""}">${flag(nm)}<span class="babbr">${esc(abbr[nm] || fi(nm))}</span><span class="bsc">${st.state !== "pre" ? esc(c.score) : ""}${c.shootoutScore != null ? `<span class="bpen">(${esc(c.shootoutScore)})</span>` : ""}</span></span>`;
     const m = nm.match(/^Round of 32 (\d+) Winner$/);
     if (m && R32_BY_N[+m[1]]) { const ts = R32_BY_N[+m[1]].competitions[0].competitors.map(x => x.team.displayName).filter(t => REAL_TEAMS.has(t)); if (ts.length === 2) return `<span class="bteam tbd">${flag(ts[0])}${flag(ts[1])}</span>`; }
     return `<span class="bteam tbd">·</span>`;
