@@ -95,6 +95,10 @@
   .picks .scorers { grid-column: 1 / -1; border-bottom: 1px solid var(--border); margin-bottom: 3px; }
   .scorers .gline { padding: 1px 0; }
   .pen { font-size: 10px; color: var(--muted); white-space: nowrap; }
+  .mscore .pen { display: block; font-weight: 400; margin-top: 1px; }
+  .koexp { color: var(--muted); opacity: .4; font-size: 13px; margin-left: 4px; display: inline-block; transition: transform .15s, opacity .15s; }
+  .match.ko.open .koexp { transform: rotate(90deg); opacity: .7; }
+  .match.ko.clickable .mrow:hover .koexp { opacity: .7; }
   .solabel { color: var(--gold); font-weight: 600; margin: 3px 0; }
   .pmiss { color: var(--live); }
   .bpen { font-size: 9px; color: var(--muted); margin-left: 1px; }
@@ -673,8 +677,8 @@ function renderPlayoffSchedule(mode) {
       h += `<div class="match ko${live ? " islive" : ""}${clickable ? " clickable" : ""}${open}"${clickable ? ` data-ko="${esc(e.id)}"` : ""}>
         <div class="mrow"${clickable ? ` onclick="toggleKo('${esc(e.id)}')"` : ""}>
         <div class="mtime">${DAY_FMT.format(when)}<br>${TIME_FMT.format(when)}</div>
-        <div class="mteams">${koName(home)} – ${koName(away)}${so ? ` <span class="pen">rp ${so.hs}–${so.as}</span>` : ""}${st.state !== "post" ? koTvBadge(e) : ""}${clickable ? ` <span class="koexp">veikkaukset ›</span>` : ""}</div>
-        <div class="mscore${score ? "" : " pre"}">${score || "–"}</div>
+        <div class="mteams">${koName(home)} – ${koName(away)}${st.state !== "post" ? koTvBadge(e) : ""}${clickable ? ` <span class="koexp">›</span>` : ""}</div>
+        <div class="mscore${score ? "" : " pre"}">${score || "–"}${so ? `<span class="pen">rp ${so.hs}–${so.as}</span>` : ""}</div>
         <div class="mstatus">${status}</div>
         </div>${clickable ? `<div class="kopicks">${st.state !== "pre" ? goalsHtml(extractGoals(c)) + shootoutHtml(so) : ""}${renderKoBackers(home.team.displayName, away.team.displayName, homeT, awayT)}</div>` : ""}
       </div>`;
