@@ -6982,7 +6982,7 @@ const POOL_DATA = {
    ]
   },
   "semiScorer": {
-   "Jarkko": "Mbappe",
+   "Jarkko": "Mbappé",
    "Sanu": "Luka Modric",
    "Anni": "Yamal",
    "ilari": "Dembele",
@@ -6997,14 +6997,14 @@ const POOL_DATA = {
    "Tuomas": "Michael Olise",
    "Sunnu": "Kane",
    "Ryde": "Kane",
-   "Salla": "Mbappe",
+   "Salla": "Mbappé",
    "Tintti": "Mbappé",
    "Jussi V": "Harry Kane",
    "Liisa": "Kane",
    "Junnu": "Doue"
   },
   "topScorer": {
-   "Jarkko": "Mbappe",
+   "Jarkko": "Mbappé",
    "Sanu": "Mbappé",
    "Anni": "Mbappé",
    "ilari": "Ronaldo",
@@ -7017,11 +7017,11 @@ const POOL_DATA = {
    "Cole": "Mbappé",
    "Jukkis": "Mbappé",
    "Tuomas": "Haaland",
-   "Sunnu": "Mbappe",
+   "Sunnu": "Mbappé",
    "Ryde": "Oyarzabal",
-   "Salla": "Mbappe",
+   "Salla": "Mbappé",
    "Tintti": "Mbappé",
-   "Jussi V": "Mbappe",
+   "Jussi V": "Mbappé",
    "Liisa": "Kane",
    "Junnu": "Luis Diaz"
   },

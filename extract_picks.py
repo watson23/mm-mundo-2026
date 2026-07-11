@@ -129,7 +129,7 @@ def team_picks(rows):
     return out
 
 # clear misspellings of scorer names -> corrected (matched on the surname token)
-SCORER_TYPO = {"mbabbe": "Mbappé"}
+SCORER_TYPO = {"mbabbe": "Mbappé", "mbappe": "Mbappé"}
 
 def fix_scorer(v):
     v = str(v or "").strip()
