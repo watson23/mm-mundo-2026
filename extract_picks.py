@@ -128,8 +128,19 @@ def team_picks(rows):
             out[p].append(t or str(v).strip())
     return out
 
+# clear misspellings of scorer names -> corrected (matched on the surname token)
+SCORER_TYPO = {"mbabbe": "Mbappé"}
+
+def fix_scorer(v):
+    v = str(v or "").strip()
+    if not v:
+        return None
+    toks = v.split()
+    fixed = [SCORER_TYPO.get(t.lower(), t) for t in toks]
+    return " ".join(fixed)
+
 def text_picks(r):
-    return {p: (str(ws.cell(row=r, column=col).value or "").strip() or None)
+    return {p: fix_scorer(ws.cell(row=r, column=col).value)
             for p, col in zip(participants, pick_cols)}
 
 def single_team_picks(r):
