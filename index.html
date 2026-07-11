@@ -629,15 +629,19 @@ function koResolveTeam(displayName) {
 }
 
 // participants who have a given team in their special bets, with which bets
-function teamSpecialBackers(team) {
+// bets still in play at a given round — earlier ones are already settled once that round is reached
+function teamSpecialBackers(team, round) {
   const s = POOL_DATA.specials, out = [];
+  const show8 = round === "r32" || round === "r16";           // top 8 settled once QF is reached
+  const show4 = show8 || round === "qf";                       // top 4 settled once SF is reached
   for (const p of POOL_DATA.participants) {
     const bets = [];
-    if ((s.top8[p] || []).includes(team)) bets.push("8 parasta");
-    if ((s.top4[p] || []).includes(team)) bets.push("4 parasta");
+    if (show8 && (s.top8[p] || []).includes(team)) bets.push("8 parasta");
+    if (show4 && (s.top4[p] || []).includes(team)) bets.push("4 parasta");
     if (s.bronze[p] === team) bets.push("pronssi");
     if (s.finalLoser[p] === team) bets.push("hopea");
     if (s.champion[p] === team) bets.push("mestari");
+    if (round === "sf" && s.semiScorer[p] && pickCountry(s.semiScorer[p]) === team) bets.push(`maali välierissä (${esc(s.semiScorer[p])})`);
     if (bets.length) out.push({ name: p, bets });
   }
   return out;
@@ -698,7 +702,7 @@ function renderPlayoffSchedule(mode) {
         <div class="mteams">${koName(home)} – ${koName(away)}${st.state !== "post" ? koTvBadge(e) : ""}${clickable ? ` <span class="koexp">›</span>` : ""}</div>
         <div class="mscore${score ? "" : " pre"}">${score || "–"}${so ? `<span class="pen">rp ${so.hs}–${so.as}</span>` : ""}</div>
         <div class="mstatus">${status}</div>
-        </div>${clickable ? `<div class="kopicks">${st.state !== "pre" ? goalsHtml(extractGoals(c)) + shootoutHtml(so) : ""}${renderKoBackers(home.team.displayName, away.team.displayName, homeT, awayT)}</div>` : ""}
+        </div>${clickable ? `<div class="kopicks">${st.state !== "pre" ? goalsHtml(extractGoals(c)) + shootoutHtml(so) : ""}${renderKoBackers(home.team.displayName, away.team.displayName, homeT, awayT, r)}</div>` : ""}
       </div>`;
     }
     h += `</div>`;
@@ -712,17 +716,20 @@ function toggleKo(id) {
   document.querySelector(`.match.ko[data-ko="${id}"]`)?.classList.toggle("open");
 }
 
-// who has each team in their special bets — shown when a knockout match is tapped
-function renderKoBackers(homeName, awayName, homeT, awayT) {
+// who has each team in their still-open special bets — shown when a knockout match is tapped
+function renderKoBackers(homeName, awayName, homeT, awayT, round) {
+  const label = round === "qf" ? "4 parasta, mitalit"
+    : round === "sf" ? "mitalit, maali välierissä"
+    : (round === "final" || round === "bronze") ? "mitalit" : "8/4 parasta, mitalit";
   const side = (displayName, realTeam) => {
     if (!realTeam) return `<div class="koside"><div class="kosh">${koSideName(displayName)}</div><div class="kob-empty">Joukkue ei vielä selvillä</div></div>`;
-    const backers = teamSpecialBackers(realTeam);
+    const backers = teamSpecialBackers(realTeam, round);
     const inner = backers.length
-      ? backers.map(b => `<div class="kob"><b>${esc(b.name)}</b> <span class="kobets">${esc(b.bets.join(" · "))}</span></div>`).join("")
-      : `<div class="kob-empty">Ei kenenkään erikoisveikkauksissa</div>`;
+      ? backers.map(b => `<div class="kob"><b>${esc(b.name)}</b> <span class="kobets">${b.bets.join(" · ")}</span></div>`).join("")
+      : `<div class="kob-empty">Ei kenenkään veikkauksissa</div>`;
     return `<div class="koside"><div class="kosh">${flag(realTeam)}${esc(fi(realTeam))}</div>${inner}</div>`;
   };
-  return `<div class="kohint">Ketkä ovat veikanneet näitä joukkueita jatkoon (8/4 parasta, mitalit):</div>
+  return `<div class="kohint">Ketkä ovat veikanneet näitä joukkueita (${label}):</div>
     <div class="kosides">${side(homeName, homeT)}${side(awayName, awayT)}</div>`;
 }
 
