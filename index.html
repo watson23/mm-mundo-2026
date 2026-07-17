@@ -838,6 +838,8 @@ function evalSpecials() {
   const finalLoser = finalDone ? loserOf(finalEv) : null;
   // S2: pronssin voi voittaa vain pronssiottelun joukkue. Muut (myös finalistit) → kuollut.
   const bronzeContenders = realTeamsOf(ko.bronze);
+  // S2b: mestarin/hopean voi saavuttaa vain finaalin joukkue. Pronssipelaajat → kuollut.
+  const finalists = realTeamsOf(ko.final);
   // S3: kun molemmat välierät pelattu, ei-osunut semiScorer on lopullisesti kuollut.
   const sfDone = ko.sf.length >= 2 && ko.sf.every(e => e.status.type.completed);
 
@@ -893,6 +895,11 @@ function evalSpecials() {
       detail.bronze.dead = true;
     detail.finalLoser = medalPick(s.finalLoser[p], finalLoser); pts += detail.finalLoser.got;
     detail.champion = medalPick(s.champion[p], champion); pts += detail.champion.got;
+    // S2b.2: mestari/hopea kuollut jos joukkue ei ole finaalissa (koskee pronssipelaajia)
+    if (!detail.finalLoser.hit && s.finalLoser[p] && finalists.size && !finalists.has(s.finalLoser[p]))
+      detail.finalLoser.dead = true;
+    if (!detail.champion.hit && s.champion[p] && finalists.size && !finalists.has(s.champion[p]))
+      detail.champion.dead = true;
     per[p] = { pts, detail };
   }
   return { per, qfTeams, sfTeams, semiScorers, topScorers, leaders, maxGoals, bronzeWinner, champion, finalLoser };
@@ -1124,7 +1131,7 @@ function renderSpecials(sp) {
     const tsC = pickCountry(ts.pick), tsOut = !ts.hit && tsC && ELIM.has(tsC);
     h += `<tr><td><b>${esc(p)}</b></td>
       <td><span class="chip ${ss.hit ? "hit" : (ssDead ? "dead" : "")}">${ssC ? flagTitled(ssC) : ""}${esc(ss.pick || "—")}${ssDead ? ` <span class="outtag" title="Ei tehnyt maalia välierissä">✕</span>` : ""}</span></td>
-      <td><span class="chip ${ts.hit ? "hit" : ""}">${tsC ? flagTitled(tsC) : ""}${esc(ts.pick || "—")}${tsOut ? ` <span class="outtag" title="Joukkue pudonnut – maalisaldo jäissä">✕</span>` : ""}</span>${ts.leading ? ` <span class="note">johdossa 👀</span>` : ""}</td>
+      <td><span class="chip ${ts.hit ? "hit" : (tsOut ? "dead" : "")}">${tsC ? flagTitled(tsC) : ""}${esc(ts.pick || "—")}${tsOut ? ` <span class="outtag" title="Joukkue pudonnut – maalisaldo jäissä">✕</span>` : ""}</span>${ts.leading ? ` <span class="note">johdossa 👀</span>` : ""}</td>
       <td class="pts">${(ss.got + ts.got) || ""}</td></tr>`;
   }
   h += `</table></div>`;
@@ -1557,7 +1564,7 @@ function renderPlayerModal() {
   const det = sp.per[name].detail;
   const teamChip = (x, decided) => `<span class="chip ${x.hit ? "hit" + (x.got > 10 ? " bonus" : "") : (ELIM.has(x.team) ? "dead" : (decided ? "miss" : ""))}">${flag(x.team)}${esc(fi(x.team))}${x.hit ? " +" + x.got : outMark(x.team)}</span>`;
   const medalChip = (x, actual) => { const isDead = x.dead || (x.pick && ELIM.has(x.pick)); return `<span class="chip ${x.hit ? "hit bonus" : (isDead ? "dead" : (actual ? "miss" : ""))}">${x.pick ? flag(x.pick) : ""}${esc(x.pick ? fi(x.pick) : "—")} (${x.potential || ""})${x.hit ? " +" + x.got : (isDead ? ` <span class="outtag" title="Ei voi enää voittaa">✕</span>` : "")}</span>`; };
-  const scorerChip = (x, extra = "") => { const c = pickCountry(x.pick), out = !x.hit && c && ELIM.has(c); return `<span class="chip ${x.hit ? "hit" : (out ? "dead" : "")}">${c ? flagTitled(c) : ""}${esc(x.pick || "—")}${x.hit ? " +" + x.got : (out ? ` <span class="outtag" title="Joukkue pudonnut">✕</span>` : "")}</span>${extra}`; };
+  const scorerChip = (x, extra = "") => { const c = pickCountry(x.pick), out = x.dead || (!x.hit && c && ELIM.has(c)); return `<span class="chip ${x.hit ? "hit" : (out ? "dead" : "")}">${c ? flagTitled(c) : ""}${esc(x.pick || "—")}${x.hit ? " +" + x.got : (out ? ` <span class="outtag" title="Ei voi enää osua">✕</span>` : "")}</span>${extra}`; };
   const specRow = (label, val) => `<div class="pspec"><div class="pspec-l">${label}</div><div class="pspec-v">${val}</div></div>`;
 
   let sps = `<h3 class="psec">Erikoisveikkaukset (${sp.per[name].pts} p)</h3>`;

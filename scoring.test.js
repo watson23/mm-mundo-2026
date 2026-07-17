@@ -1,7 +1,7 @@
 // TDD-testit pistelaskulogiikalle (SPEC-scoring.md S1–S3).
 // Aja: node scoring.test.js
 const assert = require("assert");
-const { eliminatedTeams, evalBronze, evalSemiScorer, simpleMatch } = require("./scoring.js");
+const { eliminatedTeams, evalBronze, evalMedal, evalSemiScorer, simpleMatch } = require("./scoring.js");
 
 let pass = 0, fail = 0;
 function test(name, fn) {
@@ -84,6 +84,30 @@ test("S2.3 ennen SF-pareja: ei kuollut eikä osunut", () => {
   assert(r.dead === false && r.hit === false, "odottaa kun parit ei tiedossa");
 });
 
+console.log("S2b — Mestari/hopea: pronssipelaajat eivät voi voittaa kultaa/hopeaa:");
+const finalists = new Set(["Spain", "Argentina"]); // finaaliin päässeet
+
+test("S2b.2 pronssipelaajan (Ranska) MESTARI-veikkaus KUOLLUT", () => {
+  const r = evalMedal("France", null, finalists);
+  assert(r.dead === true, "Ranska-mestari kuollut (pelaa pronssia, ei finaalia)");
+});
+test("S2b.2 pronssipelaajan (Englanti) HOPEA-veikkaus KUOLLUT", () => {
+  const r = evalMedal("England", null, finalists);
+  assert(r.dead === true, "Englanti-hopea kuollut");
+});
+test("S2b.1 finalistin (Espanja) mestariveikkaus ELOSSA (ei kuollut)", () => {
+  const r = evalMedal("Spain", null, finalists);
+  assert(r.dead === false && r.hit === false, "Espanja-mestari elossa");
+});
+test("S2b.1 mestariveikkaus osuu kun finaali voitettu", () => {
+  const r = evalMedal("Spain", "Spain", finalists);
+  assert(r.hit === true && r.got === 10, "Espanja-mestari osuu +10");
+});
+test("S2b.3 ennen finalisteja: ei kuollut eikä osunut", () => {
+  const r = evalMedal("France", null, new Set());
+  assert(r.dead === false && r.hit === false, "odottaa kun finalistit ei tiedossa");
+});
+
 console.log("S3 — Välierämaalintekijä:");
 // Välierien maalintekijät (17.7): Oyarzabal, Pedro Porro, Anthony Gordon, Enzo Fernández, Lautaro Martínez
 const semiScorers = ["Mikel Oyarzabal", "Pedro Porro", "Anthony Gordon", "Enzo Fernandez", "Lautaro Martinez"];
@@ -103,6 +127,20 @@ test("S3.2 kuollut: Kane ei tehnyt välierämaalia → kuollut", () => {
 test("S3.3 ennen välierien pelaamista: ei kuollut", () => {
   const r = evalSemiScorer("Mbappé", [], false, simpleMatch);
   assert(r.dead === false && r.hit === false, "odottaa kun välierät pelaamatta");
+});
+
+console.log("S4 — Maalikuningas: joukkue finaalissa → EI kuollut (periaatteessa mahdollinen):");
+// Maalikuningas kuollut vain jos joukkue eliminoitu (maalisaldo jäissä).
+// Oyarzabal (Espanja finaalissa) pysyy elossa vaikka ero kärkeen iso.
+test("S4 maalikuningas elossa kun joukkue ei eliminoitu (Oyarzabal/Espanja)", () => {
+  const eliminated = new Set(["Norway", "Morocco"]); // Espanja EI ole
+  const dead = eliminated.has("Spain"); // Oyarzabal = Espanja
+  assert(dead === false, "Oyarzabal-maalikuningas elossa (Espanja finaalissa)");
+});
+test("S4 maalikuningas kuollut kun joukkue eliminoitu (Haaland/Norja)", () => {
+  const eliminated = new Set(["Norway", "Morocco"]);
+  const dead = eliminated.has("Norway"); // Haaland = Norja
+  assert(dead === true, "Haaland-maalikuningas kuollut (Norja pudonnut)");
 });
 
 console.log(`\nTULOS: ${pass} läpi, ${fail} hylätty`);

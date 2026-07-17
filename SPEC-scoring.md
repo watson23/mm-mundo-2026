@@ -49,6 +49,20 @@ S3.2 Kuollut: molemmat välierät pelattu JA pelaaja ei tehnyt maalia → kuollu
      (välieriä ei enää pelata, veto ei voi enää osua).
 S3.3 Ennen välierien pelaamista: ei kuollut, ei osunut (odottaa).
 
+## S2b — Mestari- ja hopeaveikkaus (champion / finalLoser)
+
+Mestarin ja hopean (finaalihäviäjä) voi saavuttaa VAIN finaaliin päässyt joukkue.
+Pronssiottelun joukkueet (välierähäviäjät) eivät voi enää voittaa kultaa tai hopeaa.
+
+S2b.1 Osuma: veikkaus == finaalin voittaja (mestari) / finaalin häviäjä (hopea) → +pisteet.
+S2b.2 Kuollut: kun finalistit ovat tiedossa (SF pelattu), veikkaus on kuollut jos joukkue
+      EI ole finaalissa. Koskee erityisesti pronssiottelun joukkueita (Ranska, Englanti):
+      niiden mestari- ja hopeaveikkaus on kuollut.
+S2b.3 Ennen kuin finalistit ovat tiedossa: ei kuollut, ei osunut (odottaa).
+
+Peilikuva S2:lle: finalistit eivät voi voittaa pronssia (S2), pronssipelaajat eivät voi
+voittaa kultaa/hopeaa (S2b).
+
 ## S4 — Maalikuningas (topScorer)
 
 Ratkeaa vasta turnauksen lopussa.

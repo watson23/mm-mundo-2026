@@ -39,13 +39,22 @@ function eliminatedTeams(ko, realTeams) {
   return out;
 }
 
-// ── S2: Pronssiveikkaus ──
-// bronzeContenders = Set pronssiottelun joukkueista (välierähäviäjät).
-function evalBronze(pick, bronzeWinner, bronzeContenders) {
+// ── S2 / S2b: Mitaliveikkaus (yleinen) ──
+// Mitalin voi saavuttaa vain oikeassa ratkaisuottelussa pelaava joukkue.
+// contenders = Set joukkueista jotka voivat vielä saada tämän mitalin:
+//   pronssi → pronssiottelun joukkueet (välierähäviäjät)
+//   mestari/hopea → finaalin joukkueet (finalistit)
+// winner = mitalin saanut joukkue (tai null jos ratkaisematta).
+function evalMedal(pick, winner, contenders) {
   if (!pick) return { pick: null, hit: false, dead: false, got: 0 };
-  const hit = bronzeWinner === pick;                                    // S2.1
-  const dead = !hit && bronzeContenders.size > 0 && !bronzeContenders.has(pick); // S2.2 (myös finalistit)
+  const hit = winner === pick;                                         // S2.1 / S2b.1
+  const dead = !hit && contenders.size > 0 && !contenders.has(pick);   // S2.2 / S2b.2
   return { pick, hit, dead, got: hit ? medalPoints(pick) : 0 };
+}
+
+// Pronssi on erikoistapaus yleisestä mitalilaskusta (säilytetään taaksepäin­yhteensopivuus).
+function evalBronze(pick, bronzeWinner, bronzeContenders) {
+  return evalMedal(pick, bronzeWinner, bronzeContenders);
 }
 
 // ── S3: Välierämaalintekijä ──
@@ -62,4 +71,4 @@ function simpleMatch(pick, scorerName) {
   return scorerName.toLowerCase().replace(/[éè]/g, "e").includes(p);
 }
 
-module.exports = { medalPoints, eliminatedTeams, evalBronze, evalSemiScorer, simpleMatch, BIG9 };
+module.exports = { medalPoints, eliminatedTeams, evalMedal, evalBronze, evalSemiScorer, simpleMatch, BIG9 };
